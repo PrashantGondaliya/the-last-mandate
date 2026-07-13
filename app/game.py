@@ -1,7 +1,7 @@
 """Core terminal gameplay for The Last Mandate."""
 
 from app.models.game_state import GameState, STAT_LABELS
-
+from app.engine.condition_engine import event_is_available
 
 EVENTS = [
     {
@@ -162,6 +162,131 @@ EVENTS = [
             },
         ],
     },
+    {
+        "title": "THE EMPTY RESERVES",
+        "description": (
+            "The finance ministry reports that the city can no longer "
+            "fund every promised programme. Without immediate action, "
+            "salaries and essential services may be delayed next month."
+        ),
+        "conditions": [
+            {
+                "stat": "treasury",
+                "operator": "<=",
+                "value": 45,
+            }
+        ],
+        "choices": [
+            {
+                "text": "Freeze non-essential public projects.",
+                "outcome": (
+                    "The spending freeze stabilises the budget, but "
+                    "abandoned projects leave several districts angry "
+                    "and construction sites unfinished."
+                ),
+                "effects": {
+                    "treasury": 12,
+                    "infrastructure": -8,
+                    "public_trust": -4,
+                    "unrest": 5,
+                },
+            },
+            {
+                "text": (
+                    "Introduce an emergency tax on large corporations."
+                ),
+                "outcome": (
+                    "The new tax restores part of the city's reserves. "
+                    "Major employers warn that future investment may be "
+                    "moved elsewhere."
+                ),
+                "effects": {
+                    "treasury": 15,
+                    "public_trust": 3,
+                    "authority": -2,
+                    "business_confidence": -12,
+                },
+            },
+            {
+                "text": (
+                    "Impose a severe austerity package immediately."
+                ),
+                "outcome": (
+                    "The budget recovers quickly, but welfare offices "
+                    "close, public contracts are cancelled, and anger "
+                    "spreads through the city."
+                ),
+                "effects": {
+                    "treasury": 20,
+                    "public_trust": -15,
+                    "unrest": 30,
+                    "authority": 5,
+                },
+            },
+        ],
+    },
+    {
+        "title": "THE MARCH ON CITY HALL",
+        "description": (
+            "Thousands of residents are moving towards City Hall. "
+            "Protest leaders represent several unrelated groups, united "
+            "mainly by anger at your administration."
+        ),
+        "conditions": [
+            {
+                "stat": "unrest",
+                "operator": ">=",
+                "value": 40,
+            }
+        ],
+        "choices": [
+            {
+                "text": (
+                    "Invite protest leaders into immediate negotiations."
+                ),
+                "outcome": (
+                    "The demonstration remains tense but peaceful. "
+                    "Negotiations begin, and the crowds agree to leave "
+                    "the central square before nightfall."
+                ),
+                "effects": {
+                    "treasury": -4,
+                    "public_trust": 5,
+                    "unrest": -12,
+                    "authority": -3,
+                },
+            },
+            {
+                "text": "Deploy police and clear the streets.",
+                "outcome": (
+                    "Police regain control of the centre, but images of "
+                    "injured protesters spread rapidly across the city."
+                ),
+                "effects": {
+                    "public_trust": -10,
+                    "unrest": 8,
+                    "authority": 8,
+                    "business_confidence": -3,
+                },
+            },
+            {
+                "text": (
+                    "Announce immediate reforms in a live public address."
+                ),
+                "outcome": (
+                    "The speech calms part of the crowd, but your "
+                    "government must now fund the reforms it publicly "
+                    "promised."
+                ),
+                "effects": {
+                    "treasury": -8,
+                    "public_trust": 8,
+                    "unrest": -6,
+                    "authority": 2,
+                },
+            },
+        ],
+    },
 ]
 
 
@@ -209,12 +334,11 @@ def get_player_name() -> str:
 def display_event(
     event: dict,
     turn_number: int,
-    total_turns: int,
 ) -> None:
     """Display one event and its available choices."""
     display_separator()
 
-    print(f"TURN {turn_number} OF {total_turns}")
+    print(f"TURN {turn_number}")
     print(event["title"])
     print("-" * len(event["title"]))
     print()
@@ -293,20 +417,26 @@ def run_game() -> None:
 
     display_city_status(state)
 
-    total_turns = len(EVENTS)
+    turn_number = 0
 
-    for turn_number, event in enumerate(EVENTS, start=1):
+    for event in EVENTS:
+        if not event_is_available(state, event):
+            continue
+
+        turn_number += 1
+
         display_event(
             event=event,
             turn_number=turn_number,
-            total_turns=total_turns,
         )
 
         selected_choice_index = get_player_choice(
             number_of_choices=len(event["choices"])
         )
 
-        selected_choice = event["choices"][selected_choice_index]
+        selected_choice = event["choices"][
+            selected_choice_index
+        ]
 
         display_outcome(selected_choice["outcome"])
 
@@ -322,9 +452,12 @@ def run_game() -> None:
     print()
     print(
         f"Governor {state.player_name}, "
-        "your first decisions have been recorded."
+        f"you responded to {turn_number} major crises."
     )
-    print("The true consequences of your leadership are still unfolding.")
+    print(
+        "The true consequences of your leadership "
+        "are still unfolding."
+    )
 
     display_city_status(state)
     print()
