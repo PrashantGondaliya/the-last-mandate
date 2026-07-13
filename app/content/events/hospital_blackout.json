@@ -1,0 +1,40 @@
+{
+  "id": "hospital_blackout",
+  "order": 10,
+  "title": "THE HOSPITAL BLACKOUT",
+  "description": "A power failure has disabled part of the city's largest hospital. The emergency generators are running, but engineers warn that they may fail within six hours.",
+  "conditions": [],
+  "choices": [
+    {
+      "id": "repair_hospital",
+      "text": "Redirect emergency funds to repair the hospital immediately.",
+      "outcome": "The repairs begin within the hour. The hospital remains operational, but several planned road repairs are cancelled.",
+      "effects": {
+        "treasury": -12,
+        "infrastructure": 12,
+        "public_trust": 5
+      }
+    },
+    {
+      "id": "request_private_generators",
+      "text": "Ask private businesses to provide emergency generators.",
+      "outcome": "Several companies agree to help, but they now expect favourable treatment from your administration.",
+      "effects": {
+        "treasury": -3,
+        "public_trust": 2,
+        "authority": -2,
+        "business_confidence": 8
+      }
+    },
+    {
+      "id": "evacuate_patients",
+      "text": "Evacuate patients to smaller hospitals across the city.",
+      "outcome": "The evacuation prevents a total disaster, but the transport system struggles and several districts lose ambulance coverage.",
+      "effects": {
+        "public_trust": -3,
+        "unrest": 5,
+        "infrastructure": -6
+      }
+    }
+  ]
+}

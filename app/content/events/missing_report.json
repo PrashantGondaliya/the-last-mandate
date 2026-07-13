@@ -1,0 +1,40 @@
+{
+  "id": "missing_report",
+  "order": 30,
+  "title": "THE MISSING REPORT",
+  "description": "An investigative journalist claims to possess evidence that a senior minister accepted payments from a property developer. The minister denies everything and demands your public support.",
+  "conditions": [],
+  "choices": [
+    {
+      "id": "suspend_minister",
+      "text": "Suspend the minister and order an independent investigation.",
+      "outcome": "The public welcomes the investigation. Members of your own government, however, begin questioning whether you can be trusted.",
+      "effects": {
+        "public_trust": 10,
+        "unrest": -3,
+        "authority": -4,
+        "business_confidence": -2
+      }
+    },
+    {
+      "id": "defend_minister",
+      "text": "Defend the minister until stronger evidence appears.",
+      "outcome": "Your political allies remain loyal, but the journalist announces that more documents will be published tomorrow.",
+      "effects": {
+        "public_trust": -8,
+        "unrest": 6,
+        "authority": 4
+      }
+    },
+    {
+      "id": "meet_journalist",
+      "text": "Meet the journalist privately before making a decision.",
+      "outcome": "The journalist agrees to meet. Your advisers warn that the conversation could be interpreted as political interference.",
+      "effects": {
+        "public_trust": 2,
+        "unrest": 1,
+        "authority": -1
+      }
+    }
+  ]
+}

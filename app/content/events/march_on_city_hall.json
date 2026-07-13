@@ -1,0 +1,48 @@
+{
+  "id": "march_on_city_hall",
+  "order": 50,
+  "title": "THE MARCH ON CITY HALL",
+  "description": "Thousands of residents are moving towards City Hall. Protest leaders represent several unrelated groups, united mainly by anger at your administration.",
+  "conditions": [
+    {
+      "stat": "unrest",
+      "operator": ">=",
+      "value": 40
+    }
+  ],
+  "choices": [
+    {
+      "id": "negotiate_with_protesters",
+      "text": "Invite protest leaders into immediate negotiations.",
+      "outcome": "The demonstration remains tense but peaceful. Negotiations begin, and the crowds agree to leave the central square before nightfall.",
+      "effects": {
+        "treasury": -4,
+        "public_trust": 5,
+        "unrest": -12,
+        "authority": -3
+      }
+    },
+    {
+      "id": "clear_streets",
+      "text": "Deploy police and clear the streets.",
+      "outcome": "Police regain control of the centre, but images of injured protesters spread rapidly across the city.",
+      "effects": {
+        "public_trust": -10,
+        "unrest": 8,
+        "authority": 8,
+        "business_confidence": -3
+      }
+    },
+    {
+      "id": "announce_reforms",
+      "text": "Announce immediate reforms in a live public address.",
+      "outcome": "The speech calms part of the crowd, but your government must now fund the reforms it publicly promised.",
+      "effects": {
+        "treasury": -8,
+        "public_trust": 8,
+        "unrest": -6,
+        "authority": 2
+      }
+    }
+  ]
+}

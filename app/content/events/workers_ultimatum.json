@@ -1,0 +1,42 @@
+{
+  "id": "workers_ultimatum",
+  "order": 20,
+  "title": "THE WORKERS' ULTIMATUM",
+  "description": "Public transport workers have announced a city-wide strike. They demand higher wages and safer working conditions before morning.",
+  "conditions": [],
+  "choices": [
+    {
+      "id": "accept_worker_demands",
+      "text": "Accept their demands in full.",
+      "outcome": "The strike is cancelled. Workers celebrate, but the agreement creates a serious gap in the city budget.",
+      "effects": {
+        "treasury": -15,
+        "public_trust": 7,
+        "unrest": -10,
+        "business_confidence": -4
+      }
+    },
+    {
+      "id": "negotiate_with_union",
+      "text": "Offer a smaller pay increase and begin negotiations.",
+      "outcome": "Union leaders agree to delay the strike for forty-eight hours. You have gained time, but no permanent solution.",
+      "effects": {
+        "treasury": -5,
+        "public_trust": 2,
+        "unrest": -3,
+        "authority": 2
+      }
+    },
+    {
+      "id": "outlaw_strike",
+      "text": "Declare the strike unlawful and order workers back to work.",
+      "outcome": "Some workers return, but thousands gather outside the government offices. Tension spreads throughout the city.",
+      "effects": {
+        "public_trust": -10,
+        "unrest": 15,
+        "authority": 6,
+        "business_confidence": -6
+      }
+    }
+  ]
+}
