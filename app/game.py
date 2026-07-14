@@ -145,6 +145,46 @@ def display_stat_changes(
         )
 
 
+def display_decision_history(
+    state: GameState,
+) -> None:
+    """Display the player's completed decision record."""
+    print()
+    print("LEADERSHIP RECORD")
+    print("=" * 70)
+
+    if not state.decision_history:
+        print("No decisions were recorded.")
+        return
+
+    for record in state.decision_history:
+        print()
+        print(
+            f"TURN {record.turn_number}: "
+            f"{record.event_title}"
+        )
+        print(f"Decision: {record.choice_text}")
+        print("Recorded impact:")
+
+        for stat_name, values in record.stat_changes.items():
+            previous_value, updated_value = values
+            difference = updated_value - previous_value
+
+            if difference > 0:
+                difference_text = f"+{difference}"
+            else:
+                difference_text = str(difference)
+
+            print(
+                f"  - {STAT_LABELS[stat_name]}: "
+                f"{previous_value} → {updated_value} "
+                f"({difference_text})"
+            )
+
+    print()
+    print("=" * 70)
+
+
 def run_game() -> None:
     """Run the playable version of The Last Mandate."""
     player_name = get_player_name()
@@ -176,6 +216,9 @@ def run_game() -> None:
     turn_number = 0
 
     for event in events:
+        if state.has_completed_event(event["id"]):
+            continue
+
         if not event_is_available(
             state=state,
             event=event,
@@ -201,11 +244,18 @@ def run_game() -> None:
             selected_choice["outcome"]
         )
 
-        changes = state.apply_effects(
+        stat_changes = state.apply_effects(
             selected_choice["effects"]
         )
 
-        display_stat_changes(changes)
+        state.record_decision(
+            turn_number=turn_number,
+            event=event,
+            choice=selected_choice,
+            stat_changes=stat_changes,
+        )
+
+        display_stat_changes(stat_changes)
         display_city_status(state)
 
     display_separator()
@@ -214,7 +264,7 @@ def run_game() -> None:
     print(
         f"Governor {state.player_name}, "
         f"you responded to "
-        f"{turn_number} major crises."
+        f"{len(state.decision_history)} major crises."
     )
     print(
         "The true consequences of your leadership "
@@ -222,4 +272,5 @@ def run_game() -> None:
     )
 
     display_city_status(state)
+    display_decision_history(state)
     print()
