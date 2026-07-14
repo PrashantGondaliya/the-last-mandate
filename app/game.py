@@ -1,9 +1,8 @@
 """Core terminal gameplay for The Last Mandate."""
 
-from app.engine.condition_engine import event_is_available
+from app.engine.event_engine import get_next_event
 from app.engine.event_loader import EventDataError, load_events
 from app.models.game_state import GameState, STAT_LABELS
-
 
 def display_separator() -> None:
     """Display a visual separator in the terminal."""
@@ -215,15 +214,14 @@ def run_game() -> None:
 
     turn_number = 0
 
-    for event in events:
-        if state.has_completed_event(event["id"]):
-            continue
-
-        if not event_is_available(
+    while True:
+        event = get_next_event(
             state=state,
-            event=event,
-        ):
-            continue
+            events=events,
+        )
+
+        if event is None:
+            break
 
         turn_number += 1
 
@@ -265,6 +263,10 @@ def run_game() -> None:
         f"Governor {state.player_name}, "
         f"you responded to "
         f"{len(state.decision_history)} major crises."
+    )
+    print(
+        "No further major crises are currently "
+        "available."
     )
     print(
         "The true consequences of your leadership "
