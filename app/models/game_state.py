@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 
 from app.models.decision_record import DecisionRecord
+from app.models.scheduled_consequence import ScheduledConsequence
 
 
 STAT_LABELS = {
@@ -20,6 +21,8 @@ class GameState:
     """Store the current condition and history of the city."""
 
     player_name: str
+    current_turn: int = 0
+
     treasury: int = 65
     public_trust: int = 50
     unrest: int = 25
@@ -33,16 +36,22 @@ class GameState:
     decision_history: list[DecisionRecord] = field(
         default_factory=list
     )
+    scheduled_consequences: list[ScheduledConsequence] = field(
+        default_factory=list
+    )
+    resolved_consequence_ids: set[str] = field(
+        default_factory=set
+    )
 
     def apply_effects(
         self,
         effects: dict[str, int],
     ) -> dict[str, tuple[int, int]]:
         """
-        Apply decision effects to the city statistics.
+        Apply effects to the city statistics.
 
         Returns the previous and updated value for every
-        statistic affected by the decision.
+        statistic affected.
         """
         applied_changes: dict[str, tuple[int, int]] = {}
 
@@ -83,7 +92,7 @@ class GameState:
         choice: dict,
         stat_changes: dict[str, tuple[int, int]],
     ) -> DecisionRecord:
-        """Record a completed event and the selected choice."""
+        """Record a completed event and selected choice."""
         event_id = event["id"]
 
         if self.has_completed_event(event_id):
@@ -110,7 +119,7 @@ class GameState:
         self,
         event_id: str,
     ) -> bool:
-        """Return whether an event has already been completed."""
+        """Return whether an event has been completed."""
         return event_id in self.completed_event_ids
 
     def has_made_choice(

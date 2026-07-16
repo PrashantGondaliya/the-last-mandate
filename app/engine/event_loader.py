@@ -25,14 +25,18 @@ def load_events(
     """Load, validate, sort and return all JSON events."""
     if not events_directory.exists():
         raise EventDataError(
-            f"Events directory does not exist: {events_directory}"
+            f"Events directory does not exist: "
+            f"{events_directory}"
         )
 
-    event_files = sorted(events_directory.glob("*.json"))
+    event_files = sorted(
+        events_directory.glob("*.json")
+    )
 
     if not event_files:
         raise EventDataError(
-            f"No JSON event files found in: {events_directory}"
+            f"No JSON event files found in: "
+            f"{events_directory}"
         )
 
     events: list[dict[str, Any]] = []
@@ -50,12 +54,19 @@ def load_events(
         event_ids.add(event["id"])
         events.append(event)
 
-    events.sort(key=lambda event: event["order"])
+    events.sort(
+        key=lambda event: (
+            event["order"],
+            event["id"],
+        )
+    )
 
     return events
 
 
-def _load_event_file(file_path: Path) -> dict[str, Any]:
+def _load_event_file(
+    file_path: Path,
+) -> dict[str, Any]:
     """Read and decode one JSON event file."""
     try:
         with file_path.open(
@@ -68,7 +79,8 @@ def _load_event_file(file_path: Path) -> dict[str, Any]:
         raise EventDataError(
             f"Invalid JSON in {file_path.name} "
             f"at line {error.lineno}, "
-            f"column {error.colno}: {error.msg}"
+            f"column {error.colno}: "
+            f"{error.msg}"
         ) from error
 
     except OSError as error:
@@ -79,7 +91,8 @@ def _load_event_file(file_path: Path) -> dict[str, Any]:
 
     if not isinstance(data, dict):
         raise EventDataError(
-            f"{file_path.name} must contain one JSON object."
+            f"{file_path.name} must contain "
+            f"one JSON object."
         )
 
     return data
@@ -90,7 +103,7 @@ def _validate_event(
     file_path: Path,
     existing_event_ids: set[str],
 ) -> None:
-    """Validate one event and all of its nested content."""
+    """Validate one event and its nested content."""
     context = f"Event file {file_path.name}"
 
     _require_fields(
@@ -130,22 +143,26 @@ def _validate_event(
 
     if type(event["order"]) is not int:
         raise EventDataError(
-            f"{context} field 'order' must be an integer."
+            f"{context} field 'order' "
+            f"must be an integer."
         )
 
     if not isinstance(event["conditions"], list):
         raise EventDataError(
-            f"{context} field 'conditions' must be a list."
+            f"{context} field 'conditions' "
+            f"must be a list."
         )
 
     if not isinstance(event["choices"], list):
         raise EventDataError(
-            f"{context} field 'choices' must be a list."
+            f"{context} field 'choices' "
+            f"must be a list."
         )
 
     if not event["choices"]:
         raise EventDataError(
-            f"{context} must contain at least one choice."
+            f"{context} must contain "
+            f"at least one choice."
         )
 
     _validate_conditions(
@@ -169,12 +186,14 @@ def _validate_conditions(
         start=1,
     ):
         condition_context = (
-            f"{context}, condition {condition_number}"
+            f"{context}, "
+            f"condition {condition_number}"
         )
 
         if not isinstance(condition, dict):
             raise EventDataError(
-                f"{condition_context} must be an object."
+                f"{condition_context} "
+                f"must be an object."
             )
 
         _require_fields(
@@ -193,20 +212,21 @@ def _validate_conditions(
 
         if stat_name not in STAT_LABELS:
             raise EventDataError(
-                f"{condition_context} uses unknown statistic "
-                f"'{stat_name}'."
+                f"{condition_context} uses "
+                f"unknown statistic '{stat_name}'."
             )
 
         if operator_symbol not in COMPARISON_OPERATORS:
             raise EventDataError(
-                f"{condition_context} uses unsupported operator "
+                f"{condition_context} uses "
+                f"unsupported operator "
                 f"'{operator_symbol}'."
             )
 
         if type(expected_value) is not int:
             raise EventDataError(
-                f"{condition_context} field 'value' "
-                f"must be an integer."
+                f"{condition_context} field "
+                f"'value' must be an integer."
             )
 
 
@@ -222,12 +242,14 @@ def _validate_choices(
         start=1,
     ):
         choice_context = (
-            f"{context}, choice {choice_number}"
+            f"{context}, "
+            f"choice {choice_number}"
         )
 
         if not isinstance(choice, dict):
             raise EventDataError(
-                f"{choice_context} must be an object."
+                f"{choice_context} "
+                f"must be an object."
             )
 
         _require_fields(
@@ -241,7 +263,11 @@ def _validate_choices(
             context=choice_context,
         )
 
-        for field_name in ("id", "text", "outcome"):
+        for field_name in (
+            "id",
+            "text",
+            "outcome",
+        ):
             _validate_non_empty_string(
                 value=choice[field_name],
                 field_name=field_name,
@@ -252,32 +278,136 @@ def _validate_choices(
 
         if choice_id in choice_ids:
             raise EventDataError(
-                f"{choice_context} uses duplicate choice ID "
+                f"{choice_context} uses "
+                f"duplicate choice ID "
                 f"'{choice_id}'."
             )
 
         choice_ids.add(choice_id)
 
-        effects = choice["effects"]
+        _validate_effects(
+            effects=choice["effects"],
+            context=choice_context,
+        )
 
-        if not isinstance(effects, dict):
+        delayed_consequences = choice.get(
+            "delayed_consequences",
+            [],
+        )
+
+        if not isinstance(
+            delayed_consequences,
+            list,
+        ):
             raise EventDataError(
-                f"{choice_context} field 'effects' "
+                f"{choice_context} field "
+                f"'delayed_consequences' "
+                f"must be a list."
+            )
+
+        _validate_delayed_consequences(
+            delayed_consequences=delayed_consequences,
+            context=choice_context,
+        )
+
+
+def _validate_delayed_consequences(
+    delayed_consequences: list[Any],
+    context: str,
+) -> None:
+    """Validate delayed consequences belonging to a choice."""
+    consequence_ids: set[str] = set()
+
+    for consequence_number, consequence in enumerate(
+        delayed_consequences,
+        start=1,
+    ):
+        consequence_context = (
+            f"{context}, delayed consequence "
+            f"{consequence_number}"
+        )
+
+        if not isinstance(consequence, dict):
+            raise EventDataError(
+                f"{consequence_context} "
                 f"must be an object."
             )
 
-        for stat_name, amount in effects.items():
-            if stat_name not in STAT_LABELS:
-                raise EventDataError(
-                    f"{choice_context} uses unknown effect "
-                    f"statistic '{stat_name}'."
-                )
+        _require_fields(
+            data=consequence,
+            required_fields={
+                "id",
+                "delay_turns",
+                "title",
+                "description",
+                "effects",
+            },
+            context=consequence_context,
+        )
 
-            if type(amount) is not int:
-                raise EventDataError(
-                    f"{choice_context} effect '{stat_name}' "
-                    f"must be an integer."
-                )
+        for field_name in (
+            "id",
+            "title",
+            "description",
+        ):
+            _validate_non_empty_string(
+                value=consequence[field_name],
+                field_name=field_name,
+                context=consequence_context,
+            )
+
+        consequence_id = consequence["id"]
+
+        if consequence_id in consequence_ids:
+            raise EventDataError(
+                f"{consequence_context} uses "
+                f"duplicate consequence ID "
+                f"'{consequence_id}'."
+            )
+
+        consequence_ids.add(consequence_id)
+
+        delay_turns = consequence["delay_turns"]
+
+        if (
+            type(delay_turns) is not int
+            or delay_turns < 1
+        ):
+            raise EventDataError(
+                f"{consequence_context} field "
+                f"'delay_turns' must be a "
+                f"positive integer."
+            )
+
+        _validate_effects(
+            effects=consequence["effects"],
+            context=consequence_context,
+        )
+
+
+def _validate_effects(
+    effects: Any,
+    context: str,
+) -> None:
+    """Validate an effects dictionary."""
+    if not isinstance(effects, dict):
+        raise EventDataError(
+            f"{context} field 'effects' "
+            f"must be an object."
+        )
+
+    for stat_name, amount in effects.items():
+        if stat_name not in STAT_LABELS:
+            raise EventDataError(
+                f"{context} uses unknown "
+                f"effect statistic '{stat_name}'."
+            )
+
+        if type(amount) is not int:
+            raise EventDataError(
+                f"{context} effect '{stat_name}' "
+                f"must be an integer."
+            )
 
 
 def _require_fields(
@@ -285,7 +415,7 @@ def _require_fields(
     required_fields: set[str],
     context: str,
 ) -> None:
-    """Ensure that a dictionary contains required fields."""
+    """Ensure a dictionary contains required fields."""
     missing_fields = required_fields - data.keys()
 
     if missing_fields:
@@ -294,8 +424,8 @@ def _require_fields(
         )
 
         raise EventDataError(
-            f"{context} is missing required field(s): "
-            f"{formatted_fields}."
+            f"{context} is missing required "
+            f"field(s): {formatted_fields}."
         )
 
 
@@ -304,8 +434,11 @@ def _validate_non_empty_string(
     field_name: str,
     context: str,
 ) -> None:
-    """Ensure that a value is a non-empty string."""
-    if not isinstance(value, str) or not value.strip():
+    """Ensure a value is a non-empty string."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+    ):
         raise EventDataError(
             f"{context} field '{field_name}' "
             f"must be a non-empty string."

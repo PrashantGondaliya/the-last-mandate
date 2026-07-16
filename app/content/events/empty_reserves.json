@@ -42,7 +42,20 @@
         "public_trust": -15,
         "unrest": 30,
         "authority": 5
-      }
+      },
+      "delayed_consequences": [
+        {
+          "id": "public_service_breakdown",
+          "delay_turns": 2,
+          "title": "THE COST OF AUSTERITY",
+          "description": "Emergency response times increase, maintenance teams stop attending minor failures, and several public offices remain closed. The financial recovery has come with a visible human cost.",
+          "effects": {
+            "infrastructure": -12,
+            "public_trust": -8,
+            "unrest": 10
+          }
+        }
+      ]
     }
   ]
 }

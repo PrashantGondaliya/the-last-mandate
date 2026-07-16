@@ -24,7 +24,20 @@
         "public_trust": -8,
         "unrest": 6,
         "authority": 4
-      }
+      },
+      "delayed_consequences": [
+        {
+          "id": "document_leak",
+          "delay_turns": 2,
+          "title": "THE DOCUMENT LEAK",
+          "description": "The investigative journalist publishes bank records and private correspondence connecting the minister to the property developer. Your earlier public defence of the minister dominates every news channel.",
+          "effects": {
+            "public_trust": -12,
+            "unrest": 14,
+            "authority": -6
+          }
+        }
+      ]
     },
     {
       "id": "meet_journalist",
