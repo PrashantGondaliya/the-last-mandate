@@ -17,6 +17,12 @@ from app.models.game_state import (
 from app.models.scheduled_consequence import (
     ScheduledConsequence,
 )
+from app.services.save_service import (
+    SaveDataError,
+    autosave_exists,
+    load_game,
+    save_game,
+)
 
 
 def display_separator() -> None:
@@ -76,6 +82,104 @@ def get_player_name() -> str:
         print(
             "Your name cannot be empty. "
             "Please try again."
+        )
+
+
+def select_initial_state() -> GameState:
+    """Start a new game or load an existing autosave."""
+    while True:
+        display_separator()
+        print("MAIN MENU")
+        print("---------")
+        print("1. Start a new game")
+
+        save_available = autosave_exists()
+
+        if save_available:
+            print("2. Load autosave")
+        else:
+            print("2. Load autosave [no save found]")
+
+        selection = input(
+            "\nSelect an option: "
+        ).strip()
+
+        if selection == "1":
+            player_name = get_player_name()
+
+            return GameState(
+                player_name=player_name
+            )
+
+        if selection == "2":
+            if not save_available:
+                print(
+                    "No autosave exists yet."
+                )
+                continue
+
+            try:
+                state = load_game()
+            except SaveDataError as error:
+                print()
+                print("SAVE DATA ERROR")
+                print("---------------")
+                print(error)
+                continue
+
+            print()
+            print(
+                f"Autosave loaded for "
+                f"Governor {state.player_name}."
+            )
+            print(
+                f"Resuming from turn "
+                f"{state.current_turn}."
+            )
+
+            return state
+
+        print(
+            "Please enter either 1 or 2."
+        )
+
+
+def autosave_state(
+    state: GameState,
+) -> bool:
+    """Autosave without crashing the current game."""
+    try:
+        save_game(state)
+    except SaveDataError as error:
+        print()
+        print("AUTOSAVE FAILED")
+        print("---------------")
+        print(error)
+        return False
+
+    print()
+    print("Game autosaved.")
+
+    return True
+
+
+def ask_to_continue() -> bool:
+    """Ask whether the player wants another turn."""
+    while True:
+        action = input(
+            "\nPress Enter to continue "
+            "or Q to save and quit: "
+        ).strip().lower()
+
+        if action == "":
+            return True
+
+        if action == "q":
+            return False
+
+        print(
+            "Press Enter to continue "
+            "or enter Q to quit."
         )
 
 
@@ -170,7 +274,7 @@ def display_stat_changes(
 def display_scheduled_notice(
     consequences: list[ScheduledConsequence],
 ) -> None:
-    """Notify the player that future effects were created."""
+    """Notify the player about future consequences."""
     if not consequences:
         return
 
@@ -207,7 +311,7 @@ def display_time_advance(
     current_turn: int,
     target_turn: int,
 ) -> None:
-    """Display that time passes before the next consequence."""
+    """Display that time passes."""
     print()
     print("TIME PASSES")
     print("-----------")
@@ -260,9 +364,6 @@ def display_decision_history(
 
 def run_game() -> None:
     """Run the playable version of The Last Mandate."""
-    player_name = get_player_name()
-    state = GameState(player_name=player_name)
-
     try:
         events = load_events()
     except EventDataError as error:
@@ -277,8 +378,20 @@ def run_game() -> None:
         )
         return
 
+    state = select_initial_state()
+
     display_separator()
-    print(f"Welcome, Governor {state.player_name}.")
+
+    if state.current_turn == 0:
+        print(
+            f"Welcome, Governor {state.player_name}."
+        )
+    else:
+        print(
+            f"Welcome back, Governor "
+            f"{state.player_name}."
+        )
+
     print()
     print("The city is waiting for your leadership.")
     print("Every decision will create consequences.")
@@ -333,6 +446,9 @@ def run_game() -> None:
             )
             display_city_status(state)
 
+        if resolved_consequences:
+            autosave_state(state)
+
         event = get_next_event(
             state=state,
             events=events,
@@ -384,6 +500,24 @@ def run_game() -> None:
         )
 
         display_city_status(state)
+
+        autosave_state(state)
+
+        if not ask_to_continue():
+            display_separator()
+            print("SESSION SAVED")
+            print("-------------")
+            print(
+                f"Governor {state.player_name}, "
+                "your progress has been preserved."
+            )
+            print(
+                "Choose 'Load autosave' the next "
+                "time you start the game."
+            )
+            return
+
+    autosave_state(state)
 
     display_separator()
     print("END OF PROTOTYPE")
