@@ -1,0 +1,142 @@
+"""Tests for game save and load operations."""
+
+from pathlib import Path
+
+import pytest
+
+from app.engine.consequence_engine import (
+    schedule_choice_consequences,
+)
+from app.models.game_state import GameState
+from app.services.save_service import (
+    SaveDataError,
+    autosave_exists,
+    load_game,
+    save_game,
+)
+
+
+def test_save_and_load_complete_game_state(
+    tmp_path: Path,
+    fresh_state: GameState,
+    sample_event: dict,
+) -> None:
+    """A saved state should be reconstructed accurately."""
+    save_path = tmp_path / "test_save.json"
+
+    fresh_state.current_turn = 3
+    choice = sample_event["choices"][0]
+
+    changes = fresh_state.apply_effects(
+        choice["effects"]
+    )
+
+    fresh_state.record_decision(
+        turn_number=3,
+        event=sample_event,
+        choice=choice,
+        stat_changes=changes,
+    )
+
+    delayed_choice = {
+        "id": "delayed_choice",
+        "delayed_consequences": [
+            {
+                "id": "future_problem",
+                "delay_turns": 2,
+                "title": "FUTURE PROBLEM",
+                "description": "A pending consequence.",
+                "effects": {
+                    "unrest": 10,
+                },
+            }
+        ],
+    }
+
+    schedule_choice_consequences(
+        state=fresh_state,
+        event={"id": "delayed_event"},
+        choice=delayed_choice,
+    )
+
+    save_game(
+        state=fresh_state,
+        file_path=save_path,
+    )
+
+    loaded_state = load_game(
+        file_path=save_path
+    )
+
+    assert autosave_exists(save_path)
+    assert loaded_state.player_name == "Test Governor"
+    assert loaded_state.current_turn == 3
+    assert loaded_state.treasury == 60
+    assert loaded_state.public_trust == 53
+
+    assert loaded_state.completed_event_ids == {
+        "test_crisis"
+    }
+
+    assert len(
+        loaded_state.decision_history
+    ) == 1
+
+    loaded_record = (
+        loaded_state.decision_history[0]
+    )
+
+    assert loaded_record.event_id == "test_crisis"
+    assert loaded_record.choice_id == "test_choice"
+    assert loaded_record.stat_changes == {
+        "treasury": (65, 60),
+        "public_trust": (50, 53),
+    }
+
+    assert len(
+        loaded_state.scheduled_consequences
+    ) == 1
+
+    loaded_consequence = (
+        loaded_state.scheduled_consequences[0]
+    )
+
+    assert loaded_consequence.due_turn == 5
+    assert loaded_consequence.effects == {
+        "unrest": 10
+    }
+
+
+def test_loading_missing_save_raises_error(
+    tmp_path: Path,
+) -> None:
+    """Loading a nonexistent save should fail cleanly."""
+    missing_path = tmp_path / "missing.json"
+
+    with pytest.raises(
+        SaveDataError,
+        match="does not exist",
+    ):
+        load_game(
+            file_path=missing_path
+        )
+
+
+def test_loading_invalid_json_raises_error(
+    tmp_path: Path,
+) -> None:
+    """A corrupted save should produce a readable error."""
+    save_path = tmp_path / "broken_save.json"
+
+    save_path.write_text(
+        '{"save_version": 1,',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        SaveDataError,
+        match="Invalid JSON",
+    ):
+        load_game(
+            file_path=save_path
+        )
