@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 from typing import Any
-
+from app.models.character_state import RELATIONSHIP_LABELS
 from app.engine.condition_engine import COMPARISON_OPERATORS
 from app.models.game_state import STAT_LABELS
 
@@ -310,6 +310,16 @@ def _validate_choices(
             context=choice_context,
         )
 
+        character_effects = choice.get(
+            "character_effects",
+            {},
+        )
+
+        _validate_character_effects(
+            character_effects=character_effects,
+            context=choice_context,
+        )
+
 
 def _validate_delayed_consequences(
     delayed_consequences: list[Any],
@@ -384,6 +394,46 @@ def _validate_delayed_consequences(
             context=consequence_context,
         )
 
+def _validate_character_effects(
+    character_effects: Any,
+    context: str,
+) -> None:
+    """Validate optional character relationship effects."""
+    if not isinstance(character_effects, dict):
+        raise EventDataError(
+            f"{context} field 'character_effects' "
+            "must be an object."
+        )
+
+    for character_id, effects in character_effects.items():
+        if (
+            not isinstance(character_id, str)
+            or not character_id.strip()
+        ):
+            raise EventDataError(
+                f"{context} contains an invalid "
+                "character ID."
+            )
+
+        if not isinstance(effects, dict):
+            raise EventDataError(
+                f"{context} effects for character "
+                f"'{character_id}' must be an object."
+            )
+
+        for relationship_name, amount in effects.items():
+            if relationship_name not in RELATIONSHIP_LABELS:
+                raise EventDataError(
+                    f"{context} uses unknown relationship "
+                    f"'{relationship_name}'."
+                )
+
+            if type(amount) is not int:
+                raise EventDataError(
+                    f"{context} relationship "
+                    f"'{relationship_name}' for "
+                    f"'{character_id}' must be an integer."
+                )
 
 def _validate_effects(
     effects: Any,

@@ -1,0 +1,9 @@
+{
+  "id": "sofia_ren",
+  "name": "Sofia Ren",
+  "role": "Chief of Staff",
+  "description": "Your politically skilled chief of staff. Sofia understands the government from the inside and values strategic, controlled decision-making.",
+  "trust": 60,
+  "fear": 12,
+  "loyalty": 70
+}

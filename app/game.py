@@ -1,5 +1,19 @@
 """Core terminal gameplay for The Last Mandate."""
 
+from copy import deepcopy
+
+from app.engine.character_loader import (
+    CharacterDataError,
+    load_characters,
+)
+from app.engine.relationship_engine import (
+    apply_character_effects,
+)
+from app.models.character_state import (
+    CharacterState,
+    RELATIONSHIP_LABELS,
+)
+
 from app.engine.consequence_engine import (
     get_next_scheduled_turn,
     resolve_due_consequences,
@@ -85,7 +99,9 @@ def get_player_name() -> str:
         )
 
 
-def select_initial_state() -> GameState:
+def select_initial_state(
+    character_templates: dict[str, CharacterState],
+) -> GameState:
     """Start a new game or load an existing autosave."""
     while True:
         display_separator()
@@ -108,14 +124,15 @@ def select_initial_state() -> GameState:
             player_name = get_player_name()
 
             return GameState(
-                player_name=player_name
+                player_name=player_name,
+                characters=deepcopy(
+                    character_templates
+                ),
             )
 
         if selection == "2":
             if not save_available:
-                print(
-                    "No autosave exists yet."
-                )
+                print("No autosave exists yet.")
                 continue
 
             try:
@@ -139,9 +156,7 @@ def select_initial_state() -> GameState:
 
             return state
 
-        print(
-            "Please enter either 1 or 2."
-        )
+        print("Please enter either 1 or 2.")
 
 
 def autosave_state(
@@ -321,6 +336,71 @@ def display_time_advance(
         f"{current_turn} to turn {target_turn}."
     )
 
+def display_character_changes(
+    state: GameState,
+    changes: dict[
+        str,
+        dict[str, tuple[int, int]],
+    ],
+) -> None:
+    """Display relationship changes caused by a choice."""
+    if not changes:
+        return
+
+    print()
+    print("CHARACTER REACTIONS")
+    print("-------------------")
+
+    for character_id, relationship_changes in changes.items():
+        character = state.get_character(character_id)
+
+        print(f"{character.name} — {character.role}")
+
+        for relationship_name, values in (
+            relationship_changes.items()
+        ):
+            previous_value, updated_value = values
+            difference = updated_value - previous_value
+
+            if difference > 0:
+                difference_text = f"+{difference}"
+            else:
+                difference_text = str(difference)
+
+            print(
+                f"  {RELATIONSHIP_LABELS[relationship_name]}: "
+                f"{previous_value} → {updated_value} "
+                f"({difference_text})"
+            )
+
+
+def display_character_relationships(
+    state: GameState,
+) -> None:
+    """Display current relationships with major characters."""
+    print()
+    print("KEY FIGURES")
+    print("=" * 70)
+
+    if not state.characters:
+        print("No major characters are available.")
+        return
+
+    for character in sorted(
+        state.characters.values(),
+        key=lambda item: item.name,
+    ):
+        print()
+        print(f"{character.name} — {character.role}")
+        print(character.description)
+        print(
+            f"Trust: {character.trust}/100 | "
+            f"Fear: {character.fear}/100 | "
+            f"Loyalty: {character.loyalty}/100"
+        )
+
+    print()
+    print("=" * 70)
 
 def display_decision_history(
     state: GameState,
@@ -342,6 +422,45 @@ def display_decision_history(
         )
         print(f"Decision: {record.choice_text}")
         print("Recorded impact:")
+
+        if record.character_changes:
+            print("Character reactions:")
+
+            for (
+                character_id,
+                relationship_changes,
+            ) in record.character_changes.items():
+                character = state.get_character(
+                    character_id
+                )
+
+                print(f"  {character.name}:")
+
+                for (
+                    relationship_name,
+                    values,
+                ) in relationship_changes.items():
+                    previous_value, updated_value = values
+                    difference = (
+                        updated_value - previous_value
+                    )
+
+                    if difference > 0:
+                        difference_text = (
+                            f"+{difference}"
+                        )
+                    else:
+                        difference_text = str(
+                            difference
+                        )
+
+                    print(
+                        "    - "
+                        f"{RELATIONSHIP_LABELS[relationship_name]}: "
+                        f"{previous_value} → "
+                        f"{updated_value} "
+                        f"({difference_text})"
+                    )
 
         for stat_name, values in record.stat_changes.items():
             previous_value, updated_value = values
@@ -366,7 +485,12 @@ def run_game() -> None:
     """Run the playable version of The Last Mandate."""
     try:
         events = load_events()
-    except EventDataError as error:
+        character_templates = load_characters()
+
+    except (
+            EventDataError,
+            CharacterDataError,
+    ) as error:
         display_separator()
         print("GAME CONTENT ERROR")
         print("------------------")
@@ -374,13 +498,13 @@ def run_game() -> None:
         print()
         print(
             "The game could not start because one or "
-            "more event files are invalid."
+            "more content files are invalid."
         )
         return
 
-    state = select_initial_state()
-
-    display_separator()
+    state = select_initial_state(
+        character_templates
+    )
 
     if state.current_turn == 0:
         print(
@@ -398,6 +522,7 @@ def run_game() -> None:
     print("Choose carefully.")
 
     display_city_status(state)
+    display_character_relationships(state)
 
     while True:
         available_event = get_next_event(
@@ -478,11 +603,20 @@ def run_game() -> None:
             selected_choice["effects"]
         )
 
+        character_changes = apply_character_effects(
+            state=state,
+            character_effects=selected_choice.get(
+                "character_effects",
+                {},
+            ),
+        )
+
         state.record_decision(
             turn_number=state.current_turn,
             event=event,
             choice=selected_choice,
             stat_changes=stat_changes,
+            character_changes=character_changes,
         )
 
         scheduled_consequences = (
@@ -494,6 +628,11 @@ def run_game() -> None:
         )
 
         display_stat_changes(stat_changes)
+
+        display_character_changes(
+            state=state,
+            changes=character_changes,
+        )
 
         display_scheduled_notice(
             scheduled_consequences
@@ -538,5 +677,6 @@ def run_game() -> None:
     )
 
     display_city_status(state)
+    display_character_relationships(state)
     display_decision_history(state)
     print()

@@ -1,0 +1,9 @@
+{
+  "id": "elena_voss",
+  "name": "Elena Voss",
+  "role": "Investigative Journalist",
+  "description": "A respected investigative journalist known for exposing political corruption. Elena values evidence and independence, and reacts badly to intimidation.",
+  "trust": 45,
+  "fear": 8,
+  "loyalty": 25
+}

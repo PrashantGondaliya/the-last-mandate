@@ -3,7 +3,7 @@
 from pathlib import Path
 
 import pytest
-
+from app.models.character_state import CharacterState
 from app.engine.consequence_engine import (
     schedule_choice_consequences,
 )
@@ -140,3 +140,44 @@ def test_loading_invalid_json_raises_error(
         load_game(
             file_path=save_path
         )
+
+def test_character_relationships_survive_save_and_load(
+    tmp_path: Path,
+) -> None:
+    """Character relationships should survive serialization."""
+    save_path = tmp_path / "character_save.json"
+
+    character = CharacterState(
+        id="elena_voss",
+        name="Elena Voss",
+        role="Journalist",
+        description="A test description.",
+        trust=72,
+        fear=14,
+        loyalty=38,
+    )
+
+    state = GameState(
+        player_name="Test Governor",
+        characters={
+            character.id: character,
+        },
+    )
+
+    save_game(
+        state=state,
+        file_path=save_path,
+    )
+
+    loaded_state = load_game(
+        file_path=save_path,
+    )
+
+    loaded_character = (
+        loaded_state.characters["elena_voss"]
+    )
+
+    assert loaded_character.name == "Elena Voss"
+    assert loaded_character.trust == 72
+    assert loaded_character.fear == 14
+    assert loaded_character.loyalty == 38

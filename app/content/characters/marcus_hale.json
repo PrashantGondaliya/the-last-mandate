@@ -1,0 +1,9 @@
+{
+  "id": "marcus_hale",
+  "name": "Marcus Hale",
+  "role": "Police Commissioner",
+  "description": "The experienced head of the city police. Marcus values order, authority and decisive leadership, but his loyalty may become dangerous if left unchecked.",
+  "trust": 50,
+  "fear": 18,
+  "loyalty": 60
+}

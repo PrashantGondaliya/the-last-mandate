@@ -2,7 +2,11 @@
 
 from dataclasses import dataclass, field
 
-from app.models.decision_record import DecisionRecord
+from app.models.character_state import CharacterState
+from app.models.decision_record import (
+    CharacterChanges,
+    DecisionRecord,
+)
 from app.models.scheduled_consequence import ScheduledConsequence
 
 
@@ -30,6 +34,9 @@ class GameState:
     authority: int = 50
     business_confidence: int = 50
 
+    characters: dict[str, CharacterState] = field(
+        default_factory=dict
+    )
     completed_event_ids: set[str] = field(
         default_factory=set
     )
@@ -47,12 +54,7 @@ class GameState:
         self,
         effects: dict[str, int],
     ) -> dict[str, tuple[int, int]]:
-        """
-        Apply effects to the city statistics.
-
-        Returns the previous and updated value for every
-        statistic affected.
-        """
+        """Apply effects to city statistics."""
         applied_changes: dict[str, tuple[int, int]] = {}
 
         for stat_name, amount in effects.items():
@@ -91,6 +93,7 @@ class GameState:
         event: dict,
         choice: dict,
         stat_changes: dict[str, tuple[int, int]],
+        character_changes: CharacterChanges | None = None,
     ) -> DecisionRecord:
         """Record a completed event and selected choice."""
         event_id = event["id"]
@@ -108,9 +111,14 @@ class GameState:
             choice_text=choice["text"],
             effects=dict(choice["effects"]),
             stat_changes=dict(stat_changes),
+            character_changes=dict(
+                character_changes or {}
+            ),
         )
 
-        self.decision_history.append(decision_record)
+        self.decision_history.append(
+            decision_record
+        )
         self.completed_event_ids.add(event_id)
 
         return decision_record
@@ -133,3 +141,17 @@ class GameState:
             and record.choice_id == choice_id
             for record in self.decision_history
         )
+
+    def get_character(
+        self,
+        character_id: str,
+    ) -> CharacterState:
+        """Return a character or raise a useful error."""
+        character = self.characters.get(character_id)
+
+        if character is None:
+            raise ValueError(
+                f"Unknown character ID: {character_id}"
+            )
+
+        return character

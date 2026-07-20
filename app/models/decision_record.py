@@ -3,6 +3,12 @@
 from dataclasses import dataclass
 
 
+CharacterChanges = dict[
+    str,
+    dict[str, tuple[int, int]],
+]
+
+
 @dataclass
 class DecisionRecord:
     """Store one decision made by the player."""
@@ -14,3 +20,4 @@ class DecisionRecord:
     choice_text: str
     effects: dict[str, int]
     stat_changes: dict[str, tuple[int, int]]
+    character_changes: CharacterChanges

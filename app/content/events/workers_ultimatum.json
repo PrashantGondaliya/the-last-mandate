@@ -14,6 +14,15 @@
         "public_trust": 7,
         "unrest": -10,
         "business_confidence": -4
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": 4
+        },
+        "sofia_ren": {
+          "trust": -4,
+          "loyalty": -2
+        }
       }
     },
     {
@@ -25,6 +34,12 @@
         "public_trust": 2,
         "unrest": -3,
         "authority": 2
+      },
+      "character_effects": {
+        "sofia_ren": {
+          "trust": 5,
+          "loyalty": 2
+        }
       }
     },
     {
@@ -36,6 +51,16 @@
         "unrest": 15,
         "authority": 6,
         "business_confidence": -6
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": 8,
+          "loyalty": 5
+        },
+        "elena_voss": {
+          "trust": -10,
+          "fear": 4
+        }
       }
     }
   ]
