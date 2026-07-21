@@ -1,7 +1,11 @@
 """Tests for game save and load operations."""
 
 from pathlib import Path
+from pathlib import Path
 
+from app.models.character_state import CharacterState
+from app.models.game_state import GameState
+from app.services.save_service import load_game, save_game
 import pytest
 from app.models.character_state import CharacterState
 from app.engine.consequence_engine import (
@@ -181,3 +185,76 @@ def test_character_relationships_survive_save_and_load(
     assert loaded_character.trust == 72
     assert loaded_character.fear == 14
     assert loaded_character.loyalty == 38
+
+def test_decision_character_changes_survive_save_and_load(
+            tmp_path: Path,
+    ) -> None:
+        """Character reactions in decision history should survive loading."""
+        save_path = tmp_path / "decision_character_changes.json"
+
+        character = CharacterState(
+            id="elena_voss",
+            name="Elena Voss",
+            role="Journalist",
+            description="A test character.",
+            trust=45,
+            fear=8,
+            loyalty=25,
+        )
+
+        state = GameState(
+            player_name="Test Governor",
+            characters={
+                character.id: character,
+            },
+        )
+
+        event = {
+            "id": "missing_report",
+            "title": "THE MISSING REPORT",
+        }
+
+        choice = {
+            "id": "defend_minister",
+            "text": "Defend the minister.",
+            "effects": {
+                "public_trust": -8,
+            },
+        }
+
+        stat_changes = state.apply_effects(
+            choice["effects"]
+        )
+
+        character_changes = {
+            "elena_voss": {
+                "trust": (45, 30),
+                "fear": (8, 13),
+            }
+        }
+
+        state.record_decision(
+            turn_number=3,
+            event=event,
+            choice=choice,
+            stat_changes=stat_changes,
+            character_changes=character_changes,
+        )
+
+        save_game(
+            state=state,
+            file_path=save_path,
+        )
+
+        loaded_state = load_game(
+            file_path=save_path,
+        )
+
+        loaded_record = loaded_state.decision_history[0]
+
+        assert loaded_record.character_changes == {
+            "elena_voss": {
+                "trust": (45, 30),
+                "fear": (8, 13),
+            }
+        }
