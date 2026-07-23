@@ -4,9 +4,15 @@ import json
 from pathlib import Path
 from typing import Any
 from app.models.character_state import RELATIONSHIP_LABELS
-from app.engine.condition_engine import COMPARISON_OPERATORS
+#from app.engine.condition_engine import COMPARISON_OPERATORS
 from app.models.game_state import STAT_LABELS
 
+
+from app.engine.condition_engine import (
+    COMPARISON_OPERATORS,
+    CONDITION_TYPES,
+    get_condition_type,
+)
 
 EVENTS_DIRECTORY = (
     Path(__file__).resolve().parent.parent
@@ -21,6 +27,7 @@ class EventDataError(ValueError):
 
 def load_events(
     events_directory: Path = EVENTS_DIRECTORY,
+    known_character_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Load, validate, sort and return all JSON events."""
     if not events_directory.exists():
@@ -53,6 +60,14 @@ def load_events(
 
         event_ids.add(event["id"])
         events.append(event)
+
+    _validate_condition_references(events)
+
+    if known_character_ids is not None:
+        _validate_character_references(
+            events=events,
+            known_character_ids=known_character_ids,
+        )
 
     events.sort(
         key=lambda event: (
@@ -193,42 +208,184 @@ def _validate_conditions(
         if not isinstance(condition, dict):
             raise EventDataError(
                 f"{condition_context} "
-                f"must be an object."
+                "must be an object."
             )
 
-        _require_fields(
-            data=condition,
-            required_fields={
-                "stat",
-                "operator",
-                "value",
-            },
-            context=condition_context,
+        try:
+            condition_type = get_condition_type(
+                condition
+            )
+        except ValueError as error:
+            raise EventDataError(
+                f"{condition_context}: {error}"
+            ) from error
+
+        if condition_type not in CONDITION_TYPES:
+            raise EventDataError(
+                f"{condition_context} uses unsupported "
+                f"condition type '{condition_type}'."
+            )
+
+        if condition_type == "stat":
+            _validate_stat_condition(
+                condition=condition,
+                context=condition_context,
+            )
+
+        elif condition_type == "event_completed":
+            _validate_event_completed_condition(
+                condition=condition,
+                context=condition_context,
+            )
+
+        elif condition_type == "choice_made":
+            _validate_choice_made_condition(
+                condition=condition,
+                context=condition_context,
+            )
+
+        elif condition_type == "character_relationship":
+            _validate_character_relationship_condition(
+                condition=condition,
+                context=condition_context,
+            )
+
+def _validate_stat_condition(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate a city-statistic condition."""
+    _require_fields(
+        data=condition,
+        required_fields={
+            "stat",
+            "operator",
+            "value",
+        },
+        context=context,
+    )
+
+    stat_name = condition["stat"]
+
+    if stat_name not in STAT_LABELS:
+        raise EventDataError(
+            f"{context} uses unknown statistic "
+            f"'{stat_name}'."
         )
 
-        stat_name = condition["stat"]
-        operator_symbol = condition["operator"]
-        expected_value = condition["value"]
+    _validate_comparison_fields(
+        condition=condition,
+        context=context,
+    )
 
-        if stat_name not in STAT_LABELS:
-            raise EventDataError(
-                f"{condition_context} uses "
-                f"unknown statistic '{stat_name}'."
-            )
 
-        if operator_symbol not in COMPARISON_OPERATORS:
-            raise EventDataError(
-                f"{condition_context} uses "
-                f"unsupported operator "
-                f"'{operator_symbol}'."
-            )
+def _validate_event_completed_condition(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate an event-completed condition."""
+    _require_fields(
+        data=condition,
+        required_fields={
+            "type",
+            "event_id",
+        },
+        context=context,
+    )
 
-        if type(expected_value) is not int:
-            raise EventDataError(
-                f"{condition_context} field "
-                f"'value' must be an integer."
-            )
+    _validate_non_empty_string(
+        value=condition["event_id"],
+        field_name="event_id",
+        context=context,
+    )
 
+
+def _validate_choice_made_condition(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate a specific-choice condition."""
+    _require_fields(
+        data=condition,
+        required_fields={
+            "type",
+            "event_id",
+            "choice_id",
+        },
+        context=context,
+    )
+
+    _validate_non_empty_string(
+        value=condition["event_id"],
+        field_name="event_id",
+        context=context,
+    )
+
+    _validate_non_empty_string(
+        value=condition["choice_id"],
+        field_name="choice_id",
+        context=context,
+    )
+
+
+def _validate_character_relationship_condition(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate a character-relationship condition."""
+    _require_fields(
+        data=condition,
+        required_fields={
+            "type",
+            "character_id",
+            "relationship",
+            "operator",
+            "value",
+        },
+        context=context,
+    )
+
+    _validate_non_empty_string(
+        value=condition["character_id"],
+        field_name="character_id",
+        context=context,
+    )
+
+    relationship_name = condition[
+        "relationship"
+    ]
+
+    if relationship_name not in RELATIONSHIP_LABELS:
+        raise EventDataError(
+            f"{context} uses unknown relationship "
+            f"'{relationship_name}'."
+        )
+
+    _validate_comparison_fields(
+        condition=condition,
+        context=context,
+    )
+
+
+def _validate_comparison_fields(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate a comparison operator and integer value."""
+    operator_symbol = condition["operator"]
+    expected_value = condition["value"]
+
+    if operator_symbol not in COMPARISON_OPERATORS:
+        raise EventDataError(
+            f"{context} uses unsupported operator "
+            f"'{operator_symbol}'."
+        )
+
+    if type(expected_value) is not int:
+        raise EventDataError(
+            f"{context} field 'value' "
+            "must be an integer."
+        )
 
 def _validate_choices(
     choices: list[Any],
@@ -459,6 +616,115 @@ def _validate_effects(
                 f"must be an integer."
             )
 
+
+def _validate_condition_references(
+    events: list[dict[str, Any]],
+) -> None:
+    """Validate referenced event and choice IDs."""
+    events_by_id = {
+        event["id"]: event
+        for event in events
+    }
+
+    for source_event in events:
+        for condition_number, condition in enumerate(
+            source_event.get("conditions", []),
+            start=1,
+        ):
+            condition_type = get_condition_type(
+                condition
+            )
+
+            if condition_type not in {
+                "event_completed",
+                "choice_made",
+            }:
+                continue
+
+            referenced_event_id = condition[
+                "event_id"
+            ]
+
+            referenced_event = events_by_id.get(
+                referenced_event_id
+            )
+
+            if referenced_event is None:
+                raise EventDataError(
+                    f"Event '{source_event['id']}', "
+                    f"condition {condition_number}, "
+                    "references unknown event ID "
+                    f"'{referenced_event_id}'."
+                )
+
+            if condition_type != "choice_made":
+                continue
+
+            referenced_choice_id = condition[
+                "choice_id"
+            ]
+
+            valid_choice_ids = {
+                choice["id"]
+                for choice
+                in referenced_event["choices"]
+            }
+
+            if referenced_choice_id not in valid_choice_ids:
+                raise EventDataError(
+                    f"Event '{source_event['id']}', "
+                    f"condition {condition_number}, "
+                    f"references unknown choice ID "
+                    f"'{referenced_choice_id}' in event "
+                    f"'{referenced_event_id}'."
+                )
+
+
+def _validate_character_references(
+    events: list[dict[str, Any]],
+    known_character_ids: set[str],
+) -> None:
+    """Validate all character IDs used by events."""
+    for event in events:
+        for condition_number, condition in enumerate(
+            event.get("conditions", []),
+            start=1,
+        ):
+            if (
+                get_condition_type(condition)
+                != "character_relationship"
+            ):
+                continue
+
+            character_id = condition[
+                "character_id"
+            ]
+
+            if character_id not in known_character_ids:
+                raise EventDataError(
+                    f"Event '{event['id']}', "
+                    f"condition {condition_number}, "
+                    "references unknown character ID "
+                    f"'{character_id}'."
+                )
+
+        for choice_number, choice in enumerate(
+            event["choices"],
+            start=1,
+        ):
+            character_effects = choice.get(
+                "character_effects",
+                {},
+            )
+
+            for character_id in character_effects:
+                if character_id not in known_character_ids:
+                    raise EventDataError(
+                        f"Event '{event['id']}', "
+                        f"choice {choice_number}, "
+                        "references unknown character ID "
+                        f"'{character_id}'."
+                    )
 
 def _require_fields(
     data: dict[str, Any],

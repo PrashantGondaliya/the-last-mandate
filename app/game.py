@@ -484,8 +484,13 @@ def display_decision_history(
 def run_game() -> None:
     """Run the playable version of The Last Mandate."""
     try:
-        events = load_events()
         character_templates = load_characters()
+
+        events = load_events(
+            known_character_ids=set(
+                character_templates
+            )
+        )
 
     except (
             EventDataError,

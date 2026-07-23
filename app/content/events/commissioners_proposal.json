@@ -1,0 +1,88 @@
+{
+  "id": "commissioners_proposal",
+  "order": 36,
+  "title": "THE COMMISSIONER'S PROPOSAL",
+  "description": "Following the confrontation at City Hall, Commissioner Marcus Hale requests a private meeting. He argues that political hesitation is allowing disorder to spread and asks for permanent emergency powers over demonstrations, surveillance and public gatherings.",
+  "conditions": [
+    {
+      "type": "event_completed",
+      "event_id": "march_on_city_hall"
+    },
+    {
+      "type": "character_relationship",
+      "character_id": "marcus_hale",
+      "relationship": "loyalty",
+      "operator": ">=",
+      "value": 67
+    }
+  ],
+  "choices": [
+    {
+      "id": "grant_emergency_powers",
+      "text": "Grant Hale the permanent emergency powers.",
+      "outcome": "The commissioner promises absolute order. Civil-rights groups accuse your government of constructing a police state.",
+      "effects": {
+        "public_trust": -8,
+        "unrest": -3,
+        "authority": 10
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": 8,
+          "fear": -2,
+          "loyalty": 10
+        },
+        "sofia_ren": {
+          "trust": -8,
+          "loyalty": -6
+        },
+        "elena_voss": {
+          "trust": -8,
+          "fear": 5
+        }
+      }
+    },
+    {
+      "id": "create_police_oversight",
+      "text": "Reject the proposal and establish independent police oversight.",
+      "outcome": "Hale leaves the meeting furious. Reform groups welcome the oversight commission, although senior officers call it political interference.",
+      "effects": {
+        "public_trust": 6,
+        "unrest": -4,
+        "authority": -2
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": -10,
+          "fear": 4,
+          "loyalty": -12
+        },
+        "elena_voss": {
+          "trust": 4
+        },
+        "sofia_ren": {
+          "trust": 3
+        }
+      }
+    },
+    {
+      "id": "informal_security_arrangement",
+      "text": "Reject formal powers but permit an informal security arrangement.",
+      "outcome": "No official order is issued, but Hale understands that aggressive policing will not be closely questioned by your office.",
+      "effects": {
+        "public_trust": -3,
+        "authority": 4,
+        "business_confidence": 2
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": 4,
+          "loyalty": 5
+        },
+        "sofia_ren": {
+          "trust": -3
+        }
+      }
+    }
+  ]
+}

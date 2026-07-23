@@ -1,0 +1,80 @@
+{
+  "id": "elena_ultimatum",
+  "order": 32,
+  "title": "THE JOURNALIST'S ULTIMATUM",
+  "description": "Elena Voss arrives at City Hall carrying copies of the financial records. She believes your defence of the minister proves that the administration intends to bury the investigation. Before publishing everything, she offers you one final opportunity to respond.",
+  "conditions": [
+    {
+      "type": "choice_made",
+      "event_id": "missing_report",
+      "choice_id": "defend_minister"
+    },
+    {
+      "type": "character_relationship",
+      "character_id": "elena_voss",
+      "relationship": "trust",
+      "operator": "<=",
+      "value": 30
+    }
+  ],
+  "choices": [
+    {
+      "id": "admit_error",
+      "text": "Publicly admit that defending the minister was a mistake.",
+      "outcome": "Your admission dominates the evening news. Elena agrees that the public investigation should proceed before she releases the remaining private correspondence.",
+      "effects": {
+        "public_trust": 6,
+        "unrest": -4,
+        "authority": -4
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": 10,
+          "loyalty": 6
+        },
+        "sofia_ren": {
+          "trust": -4,
+          "loyalty": -3
+        }
+      }
+    },
+    {
+      "id": "request_private_delay",
+      "text": "Ask Elena to delay publication while you investigate privately.",
+      "outcome": "Elena gives you only a few hours. She leaves unconvinced that your investigation will be independent.",
+      "effects": {
+        "public_trust": -2,
+        "authority": 2
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": -6,
+          "fear": 3
+        },
+        "sofia_ren": {
+          "trust": 2
+        }
+      }
+    },
+    {
+      "id": "threaten_injunction",
+      "text": "Threaten Elena with an emergency legal injunction.",
+      "outcome": "Government lawyers begin preparing the injunction. Elena immediately informs several rival news organisations that the administration is attempting to silence her.",
+      "effects": {
+        "public_trust": -6,
+        "unrest": 8,
+        "authority": 5
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": -10,
+          "fear": 8,
+          "loyalty": -5
+        },
+        "marcus_hale": {
+          "trust": 3
+        }
+      }
+    }
+  ]
+}

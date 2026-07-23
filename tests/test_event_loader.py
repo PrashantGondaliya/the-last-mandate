@@ -159,3 +159,98 @@ def test_unknown_effect_statistic_is_rejected(
         load_events(
             events_directory=tmp_path
         )
+
+def test_unknown_condition_type_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """Unsupported narrative conditions should fail validation."""
+    event_data = build_valid_event(
+        event_id="bad_condition",
+        order=10,
+    )
+
+    event_data["conditions"] = [
+        {
+            "type": "unknown_condition",
+        }
+    ]
+
+    write_event(
+        directory=tmp_path,
+        filename="bad_condition.json",
+        event_data=event_data,
+    )
+
+    with pytest.raises(
+        EventDataError,
+        match="unsupported condition type",
+    ):
+        load_events(
+            events_directory=tmp_path
+        )
+
+def test_unknown_event_condition_reference_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """History conditions must reference existing events."""
+    event_data = build_valid_event(
+        event_id="branch_event",
+        order=10,
+    )
+
+    event_data["conditions"] = [
+        {
+            "type": "event_completed",
+            "event_id": "missing_event",
+        }
+    ]
+
+    write_event(
+        directory=tmp_path,
+        filename="branch_event.json",
+        event_data=event_data,
+    )
+
+    with pytest.raises(
+        EventDataError,
+        match="unknown event ID",
+    ):
+        load_events(
+            events_directory=tmp_path
+        )
+
+def test_unknown_character_condition_reference_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """Relationship conditions must reference known characters."""
+    event_data = build_valid_event(
+        event_id="character_branch",
+        order=10,
+    )
+
+    event_data["conditions"] = [
+        {
+            "type": "character_relationship",
+            "character_id": "unknown_character",
+            "relationship": "trust",
+            "operator": "<=",
+            "value": 30,
+        }
+    ]
+
+    write_event(
+        directory=tmp_path,
+        filename="character_branch.json",
+        event_data=event_data,
+    )
+
+    with pytest.raises(
+        EventDataError,
+        match="unknown character ID",
+    ):
+        load_events(
+            events_directory=tmp_path,
+            known_character_ids={
+                "elena_voss",
+            },
+        )
