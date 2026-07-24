@@ -6,7 +6,7 @@ from app.engine.condition_engine import (
 )
 from app.models.character_state import CharacterState
 from app.models.game_state import GameState
-
+from app.models.faction_state import FactionState
 
 def test_legacy_stat_condition_is_supported(
     fresh_state: GameState,
@@ -180,4 +180,35 @@ def test_every_event_condition_must_be_met() -> None:
     assert event_is_available(
         state=state,
         event=event,
+    )
+
+def test_faction_stat_condition() -> None:
+    """Faction statistics should control event availability."""
+    faction = FactionState(
+        id="civic_reform_alliance",
+        name="Civic Reform Alliance",
+        description="A test faction.",
+        support=67,
+        influence=48,
+        hostility=7,
+    )
+
+    state = GameState(
+        player_name="Test Governor",
+        factions={
+            faction.id: faction,
+        },
+    )
+
+    condition = {
+        "type": "faction_stat",
+        "faction_id": "civic_reform_alliance",
+        "faction_stat": "support",
+        "operator": ">=",
+        "value": 65,
+    }
+
+    assert condition_is_met(
+        state=state,
+        condition=condition,
     )

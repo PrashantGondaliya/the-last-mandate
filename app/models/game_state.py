@@ -1,11 +1,12 @@
 """Game state model for The Last Mandate."""
 
 from dataclasses import dataclass, field
-
+from app.models.faction_state import FactionState
 from app.models.character_state import CharacterState
 from app.models.decision_record import (
     CharacterChanges,
     DecisionRecord,
+    FactionChanges,
 )
 from app.models.scheduled_consequence import ScheduledConsequence
 
@@ -35,6 +36,9 @@ class GameState:
     business_confidence: int = 50
 
     characters: dict[str, CharacterState] = field(
+        default_factory=dict
+    )
+    factions: dict[str, FactionState] = field(
         default_factory=dict
     )
     completed_event_ids: set[str] = field(
@@ -88,12 +92,13 @@ class GameState:
         return applied_changes
 
     def record_decision(
-        self,
-        turn_number: int,
-        event: dict,
-        choice: dict,
-        stat_changes: dict[str, tuple[int, int]],
-        character_changes: CharacterChanges | None = None,
+            self,
+            turn_number: int,
+            event: dict,
+            choice: dict,
+            stat_changes: dict[str, tuple[int, int]],
+            character_changes: CharacterChanges | None = None,
+            faction_changes: FactionChanges | None = None,
     ) -> DecisionRecord:
         """Record a completed event and selected choice."""
         event_id = event["id"]
@@ -113,6 +118,9 @@ class GameState:
             stat_changes=dict(stat_changes),
             character_changes=dict(
                 character_changes or {}
+            ),
+            faction_changes=dict(
+                faction_changes or {}
             ),
         )
 
@@ -155,3 +163,17 @@ class GameState:
             )
 
         return character
+
+    def get_faction(
+            self,
+            faction_id: str,
+    ) -> FactionState:
+        """Return a faction or raise a useful error."""
+        faction = self.factions.get(faction_id)
+
+        if faction is None:
+            raise ValueError(
+                f"Unknown faction ID: {faction_id}"
+            )
+
+        return faction

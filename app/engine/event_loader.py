@@ -6,7 +6,7 @@ from typing import Any
 from app.models.character_state import RELATIONSHIP_LABELS
 #from app.engine.condition_engine import COMPARISON_OPERATORS
 from app.models.game_state import STAT_LABELS
-
+from app.models.faction_state import FACTION_STAT_LABELS
 
 from app.engine.condition_engine import (
     COMPARISON_OPERATORS,
@@ -28,6 +28,7 @@ class EventDataError(ValueError):
 def load_events(
     events_directory: Path = EVENTS_DIRECTORY,
     known_character_ids: set[str] | None = None,
+    known_faction_ids: set[str] | None = None,
 ) -> list[dict[str, Any]]:
     """Load, validate, sort and return all JSON events."""
     if not events_directory.exists():
@@ -75,6 +76,11 @@ def load_events(
             event["id"],
         )
     )
+    if known_faction_ids is not None:
+        _validate_faction_references(
+            events=events,
+            known_faction_ids=known_faction_ids,
+        )
 
     return events
 
@@ -234,6 +240,12 @@ def _validate_conditions(
 
         elif condition_type == "event_completed":
             _validate_event_completed_condition(
+                condition=condition,
+                context=condition_context,
+            )
+
+        elif condition_type == "faction_stat":
+            _validate_faction_stat_condition(
                 condition=condition,
                 context=condition_context,
             )
@@ -470,6 +482,16 @@ def _validate_choices(
         character_effects = choice.get(
             "character_effects",
             {},
+        )
+
+        faction_effects = choice.get(
+            "faction_effects",
+            {},
+        )
+
+        _validate_faction_effects(
+            faction_effects=faction_effects,
+            context=choice_context,
         )
 
         _validate_character_effects(
@@ -759,3 +781,124 @@ def _validate_non_empty_string(
             f"{context} field '{field_name}' "
             f"must be a non-empty string."
         )
+
+def _validate_faction_stat_condition(
+    condition: dict[str, Any],
+    context: str,
+) -> None:
+    """Validate a faction-stat condition."""
+    _require_fields(
+        data=condition,
+        required_fields={
+            "type",
+            "faction_id",
+            "faction_stat",
+            "operator",
+            "value",
+        },
+        context=context,
+    )
+
+    _validate_non_empty_string(
+        value=condition["faction_id"],
+        field_name="faction_id",
+        context=context,
+    )
+
+    stat_name = condition["faction_stat"]
+
+    if stat_name not in FACTION_STAT_LABELS:
+        raise EventDataError(
+            f"{context} uses unknown faction "
+            f"statistic '{stat_name}'."
+        )
+
+    _validate_comparison_fields(
+        condition=condition,
+        context=context,
+    )
+
+def _validate_faction_effects(
+    faction_effects: Any,
+    context: str,
+) -> None:
+    """Validate optional faction effects."""
+    if not isinstance(faction_effects, dict):
+        raise EventDataError(
+            f"{context} field 'faction_effects' "
+            "must be an object."
+        )
+
+    for faction_id, effects in faction_effects.items():
+        if (
+            not isinstance(faction_id, str)
+            or not faction_id.strip()
+        ):
+            raise EventDataError(
+                f"{context} contains an invalid "
+                "faction ID."
+            )
+
+        if not isinstance(effects, dict):
+            raise EventDataError(
+                f"{context} effects for faction "
+                f"'{faction_id}' must be an object."
+            )
+
+        for stat_name, amount in effects.items():
+            if stat_name not in FACTION_STAT_LABELS:
+                raise EventDataError(
+                    f"{context} uses unknown faction "
+                    f"statistic '{stat_name}'."
+                )
+
+            if type(amount) is not int:
+                raise EventDataError(
+                    f"{context} faction statistic "
+                    f"'{stat_name}' for '{faction_id}' "
+                    "must be an integer."
+                )
+
+def _validate_faction_references(
+    events: list[dict[str, Any]],
+    known_faction_ids: set[str],
+) -> None:
+    """Validate all faction IDs used by events."""
+    for event in events:
+        for condition_number, condition in enumerate(
+            event.get("conditions", []),
+            start=1,
+        ):
+            if (
+                get_condition_type(condition)
+                != "faction_stat"
+            ):
+                continue
+
+            faction_id = condition["faction_id"]
+
+            if faction_id not in known_faction_ids:
+                raise EventDataError(
+                    f"Event '{event['id']}', "
+                    f"condition {condition_number}, "
+                    "references unknown faction ID "
+                    f"'{faction_id}'."
+                )
+
+        for choice_number, choice in enumerate(
+            event["choices"],
+            start=1,
+        ):
+            faction_effects = choice.get(
+                "faction_effects",
+                {},
+            )
+
+            for faction_id in faction_effects:
+                if faction_id not in known_faction_ids:
+                    raise EventDataError(
+                        f"Event '{event['id']}', "
+                        f"choice {choice_number}, "
+                        "references unknown faction ID "
+                        f"'{faction_id}'."
+                    )

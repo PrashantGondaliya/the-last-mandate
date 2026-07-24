@@ -20,6 +20,15 @@
           "trust": 12,
           "loyalty": 4
         },
+        "faction_effects": {
+  "civic_reform_alliance": {
+    "support": 12,
+    "hostility": -5
+  },
+  "business_council": {
+    "support": -4
+  }
+},
         "sofia_ren": {
           "trust": -4,
           "loyalty": -6
@@ -41,6 +50,15 @@
           "fear": 5,
           "loyalty": -5
         },
+        "faction_effects": {
+  "civic_reform_alliance": {
+    "support": -15,
+    "hostility": 12
+  },
+  "business_council": {
+    "support": 5
+  }
+},
         "sofia_ren": {
           "trust": 4,
           "loyalty": 6
@@ -74,6 +92,12 @@
           "trust": 7,
           "fear": -2
         },
+        "faction_effects": {
+  "civic_reform_alliance": {
+    "support": 5,
+    "hostility": -2
+  }
+},
         "sofia_ren": {
           "trust": -3
         }

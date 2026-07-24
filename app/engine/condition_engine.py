@@ -2,7 +2,7 @@
 
 from operator import eq, ge, gt, le, lt, ne
 from typing import Any
-
+from app.models.faction_state import FACTION_STAT_LABELS
 from app.models.character_state import RELATIONSHIP_LABELS
 from app.models.game_state import GameState, STAT_LABELS
 
@@ -21,6 +21,7 @@ CONDITION_TYPES = {
     "event_completed",
     "choice_made",
     "character_relationship",
+    "faction_stat",
 }
 
 
@@ -62,6 +63,12 @@ def condition_is_met(
 
     if condition_type == "event_completed":
         return _event_completed_condition_is_met(
+            state=state,
+            condition=condition,
+        )
+
+    if condition_type == "faction_stat":
+        return _faction_stat_condition_is_met(
             state=state,
             condition=condition,
         )
@@ -212,6 +219,40 @@ def _character_relationship_condition_is_met(
         expected_value=condition.get("value"),
     )
 
+def _faction_stat_condition_is_met(
+    state: GameState,
+    condition: dict[str, Any],
+) -> bool:
+    """Evaluate one faction statistic."""
+    faction_id = condition.get("faction_id")
+    stat_name = condition.get("faction_stat")
+
+    if (
+        not isinstance(faction_id, str)
+        or not faction_id.strip()
+    ):
+        raise ValueError(
+            "Faction condition requires "
+            "a non-empty faction ID."
+        )
+
+    if stat_name not in FACTION_STAT_LABELS:
+        raise ValueError(
+            f"Unknown faction statistic: {stat_name}"
+        )
+
+    faction = state.get_faction(faction_id)
+
+    actual_value = getattr(
+        faction,
+        stat_name,
+    )
+
+    return _compare_values(
+        actual_value=actual_value,
+        operator_symbol=condition.get("operator"),
+        expected_value=condition.get("value"),
+    )
 
 def _compare_values(
     actual_value: int,

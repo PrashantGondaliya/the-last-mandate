@@ -6,14 +6,6 @@ from app.engine.character_loader import (
     CharacterDataError,
     load_characters,
 )
-from app.engine.relationship_engine import (
-    apply_character_effects,
-)
-from app.models.character_state import (
-    CharacterState,
-    RELATIONSHIP_LABELS,
-)
-
 from app.engine.consequence_engine import (
     get_next_scheduled_turn,
     resolve_due_consequences,
@@ -24,19 +16,32 @@ from app.engine.event_loader import (
     EventDataError,
     load_events,
 )
-from app.models.game_state import (
-    GameState,
-    STAT_LABELS,
+from app.engine.faction_engine import apply_faction_effects
+from app.engine.faction_loader import (
+    FactionDataError,
+    load_factions,
 )
-from app.models.scheduled_consequence import (
-    ScheduledConsequence,
+from app.engine.relationship_engine import apply_character_effects
+from app.models.character_state import (
+    CharacterState,
+    RELATIONSHIP_LABELS,
 )
+from app.models.faction_state import (
+    FACTION_STAT_LABELS,
+    FactionState,
+)
+from app.models.game_state import GameState, STAT_LABELS
+from app.models.scheduled_consequence import ScheduledConsequence
 from app.services.save_service import (
     SaveDataError,
     autosave_exists,
     load_game,
     save_game,
 )
+
+
+ValueChanges = dict[str, tuple[int, int]]
+NestedValueChanges = dict[str, ValueChanges]
 
 
 def display_separator() -> None:
@@ -51,9 +56,7 @@ def build_progress_bar(
     width: int = 20,
 ) -> str:
     """Create a text progress bar for a statistic."""
-    filled_sections = round(
-        (value / 100) * width
-    )
+    filled_sections = round((value / 100) * width)
     empty_sections = width - filled_sections
 
     return (
@@ -62,9 +65,15 @@ def build_progress_bar(
     )
 
 
-def display_city_status(
-    state: GameState,
-) -> None:
+def _format_difference(difference: int) -> str:
+    """Return a signed number suitable for terminal output."""
+    if difference > 0:
+        return f"+{difference}"
+
+    return str(difference)
+
+
+def display_city_status(state: GameState) -> None:
     """Display the current city statistics."""
     print()
     print("CITY STATUS")
@@ -101,6 +110,7 @@ def get_player_name() -> str:
 
 def select_initial_state(
     character_templates: dict[str, CharacterState],
+    faction_templates: dict[str, FactionState],
 ) -> GameState:
     """Start a new game or load an existing autosave."""
     while True:
@@ -128,6 +138,9 @@ def select_initial_state(
                 characters=deepcopy(
                     character_templates
                 ),
+                factions=deepcopy(
+                    faction_templates
+                ),
             )
 
         if selection == "2":
@@ -146,11 +159,11 @@ def select_initial_state(
 
             print()
             print(
-                f"Autosave loaded for "
+                "Autosave loaded for "
                 f"Governor {state.player_name}."
             )
             print(
-                f"Resuming from turn "
+                "Resuming from turn "
                 f"{state.current_turn}."
             )
 
@@ -159,9 +172,7 @@ def select_initial_state(
         print("Please enter either 1 or 2.")
 
 
-def autosave_state(
-    state: GameState,
-) -> bool:
+def autosave_state(state: GameState) -> bool:
     """Autosave without crashing the current game."""
     try:
         save_game(state)
@@ -224,9 +235,7 @@ def display_event(
         )
 
 
-def get_player_choice(
-    number_of_choices: int,
-) -> int:
+def get_player_choice(number_of_choices: int) -> int:
     """Ask the player to select a valid choice."""
     while True:
         raw_choice = input(
@@ -243,14 +252,12 @@ def get_player_choice(
             return choice_number - 1
 
         print(
-            f"Please enter a number between 1 and "
+            "Please enter a number between 1 and "
             f"{number_of_choices}."
         )
 
 
-def display_outcome(
-    outcome: str,
-) -> None:
+def display_outcome(outcome: str) -> None:
     """Display an immediate decision outcome."""
     print()
     print("IMMEDIATE CONSEQUENCE")
@@ -258,9 +265,7 @@ def display_outcome(
     print(outcome)
 
 
-def display_stat_changes(
-    changes: dict[str, tuple[int, int]],
-) -> None:
+def display_stat_changes(changes: ValueChanges) -> None:
     """Display changes made to city statistics."""
     print()
     print("CITY IMPACT")
@@ -274,15 +279,10 @@ def display_stat_changes(
         previous_value, updated_value = values
         difference = updated_value - previous_value
 
-        if difference > 0:
-            difference_text = f"+{difference}"
-        else:
-            difference_text = str(difference)
-
         print(
             f"{STAT_LABELS[stat_name]}: "
             f"{previous_value} → {updated_value} "
-            f"({difference_text})"
+            f"({_format_difference(difference)})"
         )
 
 
@@ -300,14 +300,14 @@ def display_scheduled_notice(
     for consequence in consequences:
         print(
             "A consequence from this decision "
-            f"may emerge on turn "
+            "may emerge on turn "
             f"{consequence.due_turn}."
         )
 
 
 def display_resolved_consequence(
     consequence: ScheduledConsequence,
-    stat_changes: dict[str, tuple[int, int]],
+    stat_changes: ValueChanges,
 ) -> None:
     """Display a delayed consequence when it occurs."""
     display_separator()
@@ -331,17 +331,15 @@ def display_time_advance(
     print("TIME PASSES")
     print("-----------")
     print(
-        f"No immediate crisis is available. "
-        f"The city advances from turn "
+        "No immediate crisis is available. "
+        "The city advances from turn "
         f"{current_turn} to turn {target_turn}."
     )
 
+
 def display_character_changes(
     state: GameState,
-    changes: dict[
-        str,
-        dict[str, tuple[int, int]],
-    ],
+    changes: NestedValueChanges,
 ) -> None:
     """Display relationship changes caused by a choice."""
     if not changes:
@@ -362,15 +360,11 @@ def display_character_changes(
             previous_value, updated_value = values
             difference = updated_value - previous_value
 
-            if difference > 0:
-                difference_text = f"+{difference}"
-            else:
-                difference_text = str(difference)
-
             print(
-                f"  {RELATIONSHIP_LABELS[relationship_name]}: "
+                "  "
+                f"{RELATIONSHIP_LABELS[relationship_name]}: "
                 f"{previous_value} → {updated_value} "
-                f"({difference_text})"
+                f"({_format_difference(difference)})"
             )
 
 
@@ -402,10 +396,65 @@ def display_character_relationships(
     print()
     print("=" * 70)
 
-def display_decision_history(
+
+def display_faction_changes(
     state: GameState,
+    changes: NestedValueChanges,
 ) -> None:
-    """Display the player's decision record."""
+    """Display faction changes caused by a decision."""
+    if not changes:
+        return
+
+    print()
+    print("FACTION REACTIONS")
+    print("-----------------")
+
+    for faction_id, faction_stat_changes in changes.items():
+        faction = state.get_faction(faction_id)
+
+        print(faction.name)
+
+        for stat_name, values in faction_stat_changes.items():
+            previous_value, updated_value = values
+            difference = updated_value - previous_value
+
+            print(
+                "  "
+                f"{FACTION_STAT_LABELS[stat_name]}: "
+                f"{previous_value} → {updated_value} "
+                f"({_format_difference(difference)})"
+            )
+
+
+def display_factions(state: GameState) -> None:
+    """Display the current political factions."""
+    print()
+    print("POLITICAL FACTIONS")
+    print("=" * 70)
+
+    if not state.factions:
+        print("No political factions are available.")
+        return
+
+    for faction in sorted(
+        state.factions.values(),
+        key=lambda item: item.name,
+    ):
+        print()
+        print(faction.name)
+        print(faction.description)
+        print(
+            f"Support: {faction.support}/100 | "
+            f"Influence: {faction.influence}/100 | "
+            f"Hostility: {faction.hostility}/100"
+        )
+
+    print()
+    print("=" * 70)
+
+
+def display_decision_history(state: GameState) -> None:
+    """Display the player's complete decision record."""
     print()
     print("LEADERSHIP RECORD")
     print("=" * 70)
@@ -421,61 +470,67 @@ def display_decision_history(
             f"{record.event_title}"
         )
         print(f"Decision: {record.choice_text}")
-        print("Recorded impact:")
 
-        if record.character_changes:
-            print("Character reactions:")
+        print("City impact:")
 
-            for (
-                character_id,
-                relationship_changes,
-            ) in record.character_changes.items():
-                character = state.get_character(
-                    character_id
-                )
-
-                print(f"  {character.name}:")
-
-                for (
-                    relationship_name,
-                    values,
-                ) in relationship_changes.items():
-                    previous_value, updated_value = values
-                    difference = (
-                        updated_value - previous_value
-                    )
-
-                    if difference > 0:
-                        difference_text = (
-                            f"+{difference}"
-                        )
-                    else:
-                        difference_text = str(
-                            difference
-                        )
-
-                    print(
-                        "    - "
-                        f"{RELATIONSHIP_LABELS[relationship_name]}: "
-                        f"{previous_value} → "
-                        f"{updated_value} "
-                        f"({difference_text})"
-                    )
+        if not record.stat_changes:
+            print("  - No city statistics changed.")
 
         for stat_name, values in record.stat_changes.items():
             previous_value, updated_value = values
             difference = updated_value - previous_value
 
-            if difference > 0:
-                difference_text = f"+{difference}"
-            else:
-                difference_text = str(difference)
-
             print(
                 f"  - {STAT_LABELS[stat_name]}: "
                 f"{previous_value} → {updated_value} "
-                f"({difference_text})"
+                f"({_format_difference(difference)})"
             )
+
+        if record.character_changes:
+            print("Character reactions:")
+
+            for character_id, relationship_changes in (
+                record.character_changes.items()
+            ):
+                character = state.get_character(character_id)
+
+                print(f"  {character.name}:")
+
+                for relationship_name, values in (
+                    relationship_changes.items()
+                ):
+                    previous_value, updated_value = values
+                    difference = updated_value - previous_value
+
+                    print(
+                        "    - "
+                        f"{RELATIONSHIP_LABELS[relationship_name]}: "
+                        f"{previous_value} → {updated_value} "
+                        f"({_format_difference(difference)})"
+                    )
+
+        if record.faction_changes:
+            print("Faction reactions:")
+
+            for faction_id, faction_stat_changes in (
+                record.faction_changes.items()
+            ):
+                faction = state.get_faction(faction_id)
+
+                print(f"  {faction.name}:")
+
+                for stat_name, values in (
+                    faction_stat_changes.items()
+                ):
+                    previous_value, updated_value = values
+                    difference = updated_value - previous_value
+
+                    print(
+                        "    - "
+                        f"{FACTION_STAT_LABELS[stat_name]}: "
+                        f"{previous_value} → {updated_value} "
+                        f"({_format_difference(difference)})"
+                    )
 
     print()
     print("=" * 70)
@@ -485,16 +540,17 @@ def run_game() -> None:
     """Run the playable version of The Last Mandate."""
     try:
         character_templates = load_characters()
+        faction_templates = load_factions()
 
         events = load_events(
-            known_character_ids=set(
-                character_templates
-            )
+            known_character_ids=set(character_templates),
+            known_faction_ids=set(faction_templates),
         )
 
     except (
-            EventDataError,
-            CharacterDataError,
+        EventDataError,
+        CharacterDataError,
+        FactionDataError,
     ) as error:
         display_separator()
         print("GAME CONTENT ERROR")
@@ -508,8 +564,11 @@ def run_game() -> None:
         return
 
     state = select_initial_state(
-        character_templates
+        character_templates=character_templates,
+        faction_templates=faction_templates,
     )
+
+    display_separator()
 
     if state.current_turn == 0:
         print(
@@ -517,7 +576,7 @@ def run_game() -> None:
         )
     else:
         print(
-            f"Welcome back, Governor "
+            "Welcome back, Governor "
             f"{state.player_name}."
         )
 
@@ -528,6 +587,7 @@ def run_game() -> None:
 
     display_city_status(state)
     display_character_relationships(state)
+    display_factions(state)
 
     while True:
         available_event = get_next_event(
@@ -556,23 +616,20 @@ def run_game() -> None:
                 target_turn=next_scheduled_turn,
             )
 
-            state.current_turn = (
-                next_scheduled_turn - 1
-            )
+            state.current_turn = next_scheduled_turn - 1
 
         state.current_turn += 1
 
-        resolved_consequences = (
-            resolve_due_consequences(state)
+        resolved_consequences = resolve_due_consequences(
+            state
         )
 
-        for (
-            consequence,
-            stat_changes,
-        ) in resolved_consequences:
+        for consequence, consequence_changes in (
+            resolved_consequences
+        ):
             display_resolved_consequence(
                 consequence=consequence,
-                stat_changes=stat_changes,
+                stat_changes=consequence_changes,
             )
             display_city_status(state)
 
@@ -616,12 +673,21 @@ def run_game() -> None:
             ),
         )
 
+        faction_changes = apply_faction_effects(
+            state=state,
+            faction_effects=selected_choice.get(
+                "faction_effects",
+                {},
+            ),
+        )
+
         state.record_decision(
             turn_number=state.current_turn,
             event=event,
             choice=selected_choice,
             stat_changes=stat_changes,
             character_changes=character_changes,
+            faction_changes=faction_changes,
         )
 
         scheduled_consequences = (
@@ -637,6 +703,11 @@ def run_game() -> None:
         display_character_changes(
             state=state,
             changes=character_changes,
+        )
+
+        display_faction_changes(
+            state=state,
+            changes=faction_changes,
         )
 
         display_scheduled_notice(
@@ -668,12 +739,12 @@ def run_game() -> None:
     print()
     print(
         f"Governor {state.player_name}, "
-        f"you responded to "
+        "you responded to "
         f"{len(state.decision_history)} "
-        f"major crises."
+        "major crises."
     )
     print(
-        f"Your administration lasted "
+        "Your administration lasted "
         f"{state.current_turn} turns."
     )
     print(
@@ -683,5 +754,6 @@ def run_game() -> None:
 
     display_city_status(state)
     display_character_relationships(state)
+    display_factions(state)
     display_decision_history(state)
     print()

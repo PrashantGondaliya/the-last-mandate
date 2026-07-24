@@ -1,0 +1,8 @@
+{
+  "id": "labour_federation",
+  "name": "Labour Federation",
+  "description": "A powerful coalition of transport workers, public employees, industrial unions and local organisers. It can mobilise strikes and large demonstrations.",
+  "support": 55,
+  "influence": 65,
+  "hostility": 15
+}

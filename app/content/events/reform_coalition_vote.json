@@ -1,0 +1,101 @@
+{
+  "id": "reform_coalition_vote",
+  "order": 34,
+  "title": "THE REFORM COALITION VOTE",
+  "description": "The Civic Reform Alliance believes your recent actions have created a rare opportunity for institutional change. Its leaders offer public support for your administration if you introduce a binding anti-corruption package.",
+  "conditions": [
+    {
+      "type": "event_completed",
+      "event_id": "missing_report"
+    },
+    {
+      "type": "faction_stat",
+      "faction_id": "civic_reform_alliance",
+      "faction_stat": "support",
+      "operator": ">=",
+      "value": 65
+    }
+  ],
+  "choices": [
+    {
+      "id": "accept_full_reform_package",
+      "text": "Accept the complete reform package.",
+      "outcome": "The alliance publicly endorses your administration. Several senior officials privately warn that the reforms will limit the government's freedom to act.",
+      "effects": {
+        "public_trust": 8,
+        "authority": -5,
+        "business_confidence": -3
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": 6,
+          "loyalty": 4
+        },
+        "sofia_ren": {
+          "trust": -4
+        }
+      },
+      "faction_effects": {
+        "civic_reform_alliance": {
+          "support": 10,
+          "hostility": -6
+        },
+        "business_council": {
+          "support": -5,
+          "hostility": 4
+        }
+      }
+    },
+    {
+      "id": "offer_limited_reforms",
+      "text": "Offer a narrower package controlled by your office.",
+      "outcome": "The alliance accepts parts of the proposal but refuses to endorse your administration without stronger independent oversight.",
+      "effects": {
+        "public_trust": 3,
+        "authority": 2
+      },
+      "character_effects": {
+        "sofia_ren": {
+          "trust": 4
+        },
+        "elena_voss": {
+          "trust": -2
+        }
+      },
+      "faction_effects": {
+        "civic_reform_alliance": {
+          "support": -3,
+          "hostility": 3
+        }
+      }
+    },
+    {
+      "id": "reject_reform_pressure",
+      "text": "Reject the alliance's attempt to dictate government policy.",
+      "outcome": "The alliance withdraws its offer and announces that it will campaign against the administration's lack of transparency.",
+      "effects": {
+        "public_trust": -6,
+        "authority": 5,
+        "unrest": 4
+      },
+      "character_effects": {
+        "elena_voss": {
+          "trust": -8,
+          "loyalty": -4
+        },
+        "sofia_ren": {
+          "trust": 3
+        }
+      },
+      "faction_effects": {
+        "civic_reform_alliance": {
+          "support": -15,
+          "hostility": 14
+        },
+        "business_council": {
+          "support": 4
+        }
+      }
+    }
+  ]
+}

@@ -4,19 +4,19 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
+
 from app.models.character_state import CharacterState
 from app.models.decision_record import DecisionRecord
+from app.models.faction_state import FactionState
 from app.models.game_state import GameState, STAT_LABELS
-from app.models.scheduled_consequence import (
-    ScheduledConsequence,
-)
+from app.models.scheduled_consequence import ScheduledConsequence
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 SAVES_DIRECTORY = PROJECT_ROOT / "saves"
 AUTOSAVE_PATH = SAVES_DIRECTORY / "autosave.json"
 
-SAVE_VERSION = 2
+SAVE_VERSION = 3
 
 
 class SaveDataError(ValueError):
@@ -52,6 +52,11 @@ def save_game(
                 character_id: asdict(character)
                 for character_id, character
                 in sorted(state.characters.items())
+            },
+            "factions": {
+                faction_id: asdict(faction)
+                for faction_id, faction
+                in sorted(state.factions.items())
             },
             "completed_event_ids": sorted(
                 state.completed_event_ids
@@ -150,20 +155,6 @@ def load_game(
     _validate_state_fields(state_data)
 
     try:
-        decision_history = [
-            _deserialize_decision_record(record_data)
-            for record_data
-            in state_data["decision_history"]
-        ]
-
-        scheduled_consequences = [
-            _deserialize_scheduled_consequence(
-                consequence_data
-            )
-            for consequence_data
-            in state_data["scheduled_consequences"]
-        ]
-
         characters = {
             character_id: _deserialize_character_state(
                 character_data
@@ -180,6 +171,36 @@ def load_game(
                     f"character ID '{character.id}'."
                 )
 
+        factions = {
+            faction_id: _deserialize_faction_state(
+                faction_data
+            )
+            for faction_id, faction_data
+            in state_data["factions"].items()
+        }
+
+        for faction_id, faction in factions.items():
+            if faction.id != faction_id:
+                raise SaveDataError(
+                    "Saved faction dictionary key "
+                    f"'{faction_id}' does not match "
+                    f"faction ID '{faction.id}'."
+                )
+
+        decision_history = [
+            _deserialize_decision_record(record_data)
+            for record_data
+            in state_data["decision_history"]
+        ]
+
+        scheduled_consequences = [
+            _deserialize_scheduled_consequence(
+                consequence_data
+            )
+            for consequence_data
+            in state_data["scheduled_consequences"]
+        ]
+
         state = GameState(
             player_name=state_data["player_name"],
             current_turn=state_data["current_turn"],
@@ -191,10 +212,11 @@ def load_game(
             business_confidence=(
                 state_data["business_confidence"]
             ),
+            characters=characters,
+            factions=factions,
             completed_event_ids=set(
                 state_data["completed_event_ids"]
             ),
-            characters=characters,
             decision_history=decision_history,
             scheduled_consequences=(
                 scheduled_consequences
@@ -203,6 +225,9 @@ def load_game(
                 state_data["resolved_consequence_ids"]
             ),
         )
+
+    except SaveDataError:
+        raise
 
     except (
         KeyError,
@@ -226,12 +251,13 @@ def _validate_state_fields(
         "player_name",
         "current_turn",
         "treasury",
-        "characters",
         "public_trust",
         "unrest",
         "infrastructure",
         "authority",
         "business_confidence",
+        "characters",
+        "factions",
         "completed_event_ids",
         "decision_history",
         "scheduled_consequences",
@@ -264,21 +290,29 @@ def _validate_state_fields(
         ):
             raise SaveDataError(
                 f"Save field '{field_name}' "
-                f"must be a list."
+                "must be a list."
             )
-    if not isinstance(
-        state_data["characters"],
-        dict,
-    ):
-        raise SaveDataError(
-            "Save field 'characters' must be an object."
-        )
+
+    dictionary_fields = {
+        "characters",
+        "factions",
+    }
+
+    for field_name in dictionary_fields:
+        if not isinstance(
+            state_data[field_name],
+            dict,
+        ):
+            raise SaveDataError(
+                f"Save field '{field_name}' "
+                "must be an object."
+            )
 
 
 def _deserialize_character_state(
     character_data: Any,
 ) -> CharacterState:
-    """Convert serialized data into CharacterState."""
+    """Convert serialized data into a CharacterState."""
     if not isinstance(character_data, dict):
         raise SaveDataError(
             "Every saved character must be an object."
@@ -318,6 +352,49 @@ def _deserialize_character_state(
         loyalty=character_data["loyalty"],
     )
 
+
+def _deserialize_faction_state(
+    faction_data: Any,
+) -> FactionState:
+    """Convert serialized data into a FactionState."""
+    if not isinstance(faction_data, dict):
+        raise SaveDataError(
+            "Every saved faction must be an object."
+        )
+
+    required_fields = {
+        "id",
+        "name",
+        "description",
+        "support",
+        "influence",
+        "hostility",
+    }
+
+    missing_fields = (
+        required_fields - faction_data.keys()
+    )
+
+    if missing_fields:
+        formatted_fields = ", ".join(
+            sorted(missing_fields)
+        )
+
+        raise SaveDataError(
+            "A saved faction is missing field(s): "
+            f"{formatted_fields}."
+        )
+
+    return FactionState(
+        id=faction_data["id"],
+        name=faction_data["name"],
+        description=faction_data["description"],
+        support=faction_data["support"],
+        influence=faction_data["influence"],
+        hostility=faction_data["hostility"],
+    )
+
+
 def _deserialize_decision_record(
     record_data: Any,
 ) -> DecisionRecord:
@@ -335,6 +412,8 @@ def _deserialize_decision_record(
         "choice_text",
         "effects",
         "stat_changes",
+        "character_changes",
+        "faction_changes",
     }
 
     missing_fields = required_fields - record_data.keys()
@@ -349,36 +428,26 @@ def _deserialize_decision_record(
             f"{formatted_fields}."
         )
 
-    stat_changes_data = record_data["stat_changes"]
+    effects = record_data["effects"]
 
-    if not isinstance(stat_changes_data, dict):
+    if not isinstance(effects, dict):
         raise SaveDataError(
-            "Decision stat changes must be an object."
+            "Decision effects must be an object."
         )
 
-    stat_changes: dict[str, tuple[int, int]] = {}
+    stat_changes = _deserialize_value_changes(
+        changes_data=record_data["stat_changes"],
+        label="stat",
+    )
 
-    for stat_name, values in stat_changes_data.items():
-        if (
-            not isinstance(values, list)
-            or len(values) != 2
-            or type(values[0]) is not int
-            or type(values[1]) is not int
-        ):
-            raise SaveDataError(
-                f"Invalid saved stat change "
-                f"for '{stat_name}'."
-            )
+    character_changes = _deserialize_nested_changes(
+        changes_data=record_data["character_changes"],
+        label="character",
+    )
 
-        stat_changes[stat_name] = (
-            values[0],
-            values[1],
-        )
-
-    character_changes = (
-        _deserialize_character_changes(
-            record_data["character_changes"]
-        )
+    faction_changes = _deserialize_nested_changes(
+        changes_data=record_data["faction_changes"],
+        label="faction",
     )
 
     return DecisionRecord(
@@ -387,60 +456,102 @@ def _deserialize_decision_record(
         event_title=record_data["event_title"],
         choice_id=record_data["choice_id"],
         choice_text=record_data["choice_text"],
-        effects=dict(record_data["effects"]),
+        effects=dict(effects),
         stat_changes=stat_changes,
         character_changes=character_changes,
+        faction_changes=faction_changes,
     )
 
-def _deserialize_character_changes(
+
+def _deserialize_value_changes(
     changes_data: Any,
-) -> dict[str, dict[str, tuple[int, int]]]:
-    """Restore nested character relationship changes."""
+    label: str,
+) -> dict[str, tuple[int, int]]:
+    """Restore one level of before-and-after value changes."""
     if not isinstance(changes_data, dict):
         raise SaveDataError(
-            "Decision character changes must be an object."
+            f"Decision {label} changes must be an object."
         )
 
-    character_changes: dict[
+    restored_changes: dict[
+        str,
+        tuple[int, int],
+    ] = {}
+
+    for value_name, values in changes_data.items():
+        restored_changes[value_name] = (
+            _deserialize_change_pair(
+                values=values,
+                context=f"{label} '{value_name}'",
+            )
+        )
+
+    return restored_changes
+
+
+def _deserialize_nested_changes(
+    changes_data: Any,
+    label: str,
+) -> dict[str, dict[str, tuple[int, int]]]:
+    """Restore nested before-and-after value changes."""
+    if not isinstance(changes_data, dict):
+        raise SaveDataError(
+            f"Decision {label} changes must be an object."
+        )
+
+    restored_changes: dict[
         str,
         dict[str, tuple[int, int]],
     ] = {}
 
-    for character_id, relationship_data in changes_data.items():
-        if not isinstance(relationship_data, dict):
+    for object_id, value_changes in changes_data.items():
+        if not isinstance(value_changes, dict):
             raise SaveDataError(
-                "Saved relationship changes for "
-                f"'{character_id}' must be an object."
+                f"Saved {label} changes for "
+                f"'{object_id}' must be an object."
             )
 
-        character_changes[character_id] = {}
+        restored_changes[object_id] = {}
 
-        for relationship_name, values in relationship_data.items():
-            if (
-                not isinstance(values, list)
-                or len(values) != 2
-                or type(values[0]) is not int
-                or type(values[1]) is not int
-            ):
-                raise SaveDataError(
-                    "Invalid saved relationship change "
-                    f"for '{character_id}."
-                    f"{relationship_name}'."
+        for value_name, values in value_changes.items():
+            restored_changes[object_id][value_name] = (
+                _deserialize_change_pair(
+                    values=values,
+                    context=(
+                        f"{label} "
+                        f"'{object_id}.{value_name}'"
+                    ),
                 )
-
-            character_changes[character_id][
-                relationship_name
-            ] = (
-                values[0],
-                values[1],
             )
 
-    return character_changes
+    return restored_changes
+
+
+def _deserialize_change_pair(
+    values: Any,
+    context: str,
+) -> tuple[int, int]:
+    """Restore one saved before-and-after integer pair."""
+    if (
+        not isinstance(values, list)
+        or len(values) != 2
+        or type(values[0]) is not int
+        or type(values[1]) is not int
+    ):
+        raise SaveDataError(
+            f"Invalid saved change for {context}."
+        )
+
+    return (
+        values[0],
+        values[1],
+    )
+
 
 def _deserialize_scheduled_consequence(
     consequence_data: Any,
 ) -> ScheduledConsequence:
-    """Convert serialized data into a scheduled consequence."""
+    """Convert serialized data into a ScheduledConsequence."""
     if not isinstance(consequence_data, dict):
         raise SaveDataError(
             "Every scheduled consequence "
@@ -471,6 +582,14 @@ def _deserialize_scheduled_consequence(
             f"field(s): {formatted_fields}."
         )
 
+    effects = consequence_data["effects"]
+
+    if not isinstance(effects, dict):
+        raise SaveDataError(
+            "Scheduled consequence effects "
+            "must be an object."
+        )
+
     return ScheduledConsequence(
         id=consequence_data["id"],
         source_event_id=(
@@ -482,7 +601,7 @@ def _deserialize_scheduled_consequence(
         due_turn=consequence_data["due_turn"],
         title=consequence_data["title"],
         description=consequence_data["description"],
-        effects=dict(consequence_data["effects"]),
+        effects=dict(effects),
     )
 
 
@@ -517,7 +636,7 @@ def _validate_loaded_state(
         ):
             raise SaveDataError(
                 f"Saved statistic '{stat_name}' "
-                f"must be an integer between 0 and 100."
+                "must be an integer between 0 and 100."
             )
 
     if not all(
@@ -538,6 +657,14 @@ def _validate_loaded_state(
             "must be strings."
         )
 
+    _validate_loaded_characters(state)
+    _validate_loaded_factions(state)
+
+
+def _validate_loaded_characters(
+    state: GameState,
+) -> None:
+    """Validate all reconstructed character states."""
     for character_id, character in state.characters.items():
         if character.id != character_id:
             raise SaveDataError(
@@ -563,4 +690,36 @@ def _validate_loaded_state(
                     f"Character '{character_id}' "
                     f"relationship '{relationship_name}' "
                     "must be between 0 and 100."
+                )
+
+
+def _validate_loaded_factions(
+    state: GameState,
+) -> None:
+    """Validate all reconstructed faction states."""
+    for faction_id, faction in state.factions.items():
+        if faction.id != faction_id:
+            raise SaveDataError(
+                f"Faction key '{faction_id}' does "
+                "not match its internal ID."
+            )
+
+        for stat_name in (
+            "support",
+            "influence",
+            "hostility",
+        ):
+            value = getattr(
+                faction,
+                stat_name,
+            )
+
+            if (
+                type(value) is not int
+                or not 0 <= value <= 100
+            ):
+                raise SaveDataError(
+                    f"Faction '{faction_id}' statistic "
+                    f"'{stat_name}' must be between "
+                    "0 and 100."
                 )

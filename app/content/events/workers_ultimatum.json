@@ -19,6 +19,16 @@
         "elena_voss": {
           "trust": 4
         },
+      "faction_effects": {
+        "labour_federation": {
+          "support": 12,
+          "hostility": -6
+        },
+        "business_council": {
+          "support": -8,
+          "hostility": 5
+        }
+      },
         "sofia_ren": {
           "trust": -4,
           "loyalty": -2
@@ -40,6 +50,15 @@
           "trust": 5,
           "loyalty": 2
         }
+      },
+      "faction_effects": {
+        "labour_federation": {
+          "support": 5,
+          "hostility": -2
+        },
+        "business_council": {
+          "support": -2
+        }
       }
     },
     {
@@ -56,6 +75,16 @@
         "marcus_hale": {
           "trust": 8,
           "loyalty": 5
+        },
+       "faction_effects": {
+          "labour_federation": {
+            "support": -18,
+            "hostility": 15
+          },
+          "business_council": {
+            "support": 8,
+            "hostility": -3
+          }
         },
         "elena_voss": {
           "trust": -10,

@@ -8,6 +8,11 @@ CharacterChanges = dict[
     dict[str, tuple[int, int]],
 ]
 
+FactionChanges = dict[
+    str,
+    dict[str, tuple[int, int]],
+]
+
 
 @dataclass
 class DecisionRecord:
@@ -21,3 +26,4 @@ class DecisionRecord:
     effects: dict[str, int]
     stat_changes: dict[str, tuple[int, int]]
     character_changes: CharacterChanges
+    faction_changes: FactionChanges

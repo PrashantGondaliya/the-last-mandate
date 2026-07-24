@@ -2,7 +2,7 @@
 
 from pathlib import Path
 from pathlib import Path
-
+from app.models.faction_state import FactionState
 from app.models.character_state import CharacterState
 from app.models.game_state import GameState
 from app.services.save_service import load_game, save_game
@@ -258,3 +258,42 @@ def test_decision_character_changes_survive_save_and_load(
                 "fear": (8, 13),
             }
         }
+
+def test_faction_state_survives_save_and_load(
+    tmp_path: Path,
+) -> None:
+    """Faction political values should survive loading."""
+    save_path = tmp_path / "faction_save.json"
+
+    faction = FactionState(
+        id="business_council",
+        name="Business Council",
+        description="A test faction.",
+        support=38,
+        influence=72,
+        hostility=41,
+    )
+
+    state = GameState(
+        player_name="Test Governor",
+        factions={
+            faction.id: faction,
+        },
+    )
+
+    save_game(
+        state=state,
+        file_path=save_path,
+    )
+
+    loaded_state = load_game(
+        file_path=save_path,
+    )
+
+    loaded_faction = loaded_state.factions[
+        "business_council"
+    ]
+
+    assert loaded_faction.support == 38
+    assert loaded_faction.influence == 72
+    assert loaded_faction.hostility == 41
