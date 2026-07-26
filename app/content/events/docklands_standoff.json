@@ -1,0 +1,150 @@
+{
+  "id": "docklands_standoff",
+  "order": 40,
+  "title": "THE DOCKLANDS STANDOFF",
+  "description": "Hundreds of demonstrators have occupied the Docklands distribution district. Police units are waiting for instructions while conflicting reports reach City Hall.",
+  "conditions": [
+    {
+      "type": "event_completed",
+      "event_id": "march_on_city_hall"
+    }
+  ],
+  "reports": [
+    {
+      "id": "docklands_hale_armed_groups",
+      "source_character_id": "marcus_hale",
+      "statement": "Commissioner Hale claims that armed organisers are preparing to attack police positions from inside the district.",
+      "reliability": 35,
+      "truth": "exaggerated",
+      "reveal_after_turns": 2,
+      "revelation": {
+        "title": "THE ALLEGED WEAPONS",
+        "text": "Independent investigators find no organised armed group inside the district. Several metal objects identified by police intelligence were construction tools and medical equipment. A small number of demonstrators carried improvised weapons, but Hale's report significantly exaggerated the threat."
+      }
+    },
+    {
+      "id": "docklands_elena_medical_crates",
+      "source_character_id": "elena_voss",
+      "statement": "Elena Voss reports that the suspicious crates photographed inside the occupation mostly contain food, medical supplies and protective equipment.",
+      "reliability": 82,
+      "truth": "accurate",
+      "reveal_after_turns": 2,
+      "revelation": {
+        "title": "THE CONTENTS OF THE CRATES",
+        "text": "Released warehouse footage confirms that most crates contained bottled water, first-aid equipment, food and protective masks. Elena's description was substantially accurate."
+      }
+    }
+  ],
+  "choices": [
+    {
+      "id": "authorise_police_assault",
+      "text": "Trust Hale's warning and authorise an immediate police assault.",
+      "outcome": "Riot police enter the district using armoured vehicles, tear gas and mass arrests. The occupation ends quickly, but reports of civilian injuries spread across the city.",
+      "effects": {
+        "public_trust": -8,
+        "unrest": 7,
+        "authority": 8,
+        "business_confidence": 5
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": 7,
+          "loyalty": 8
+        },
+        "elena_voss": {
+          "trust": -10,
+          "fear": 5,
+          "loyalty": -5
+        }
+      },
+      "faction_effects": {
+        "labour_federation": {
+          "support": -12,
+          "hostility": 10
+        },
+        "business_council": {
+          "support": 8,
+          "hostility": -4
+        },
+        "civic_reform_alliance": {
+          "support": -8,
+          "hostility": 7
+        }
+      }
+    },
+    {
+      "id": "send_independent_observers",
+      "text": "Delay police action and send independent observers into the district.",
+      "outcome": "Legal observers and emergency officials enter the occupied district. The delay frustrates police commanders and business leaders, but immediate violence is avoided.",
+      "effects": {
+        "public_trust": 4,
+        "unrest": -3,
+        "authority": -2,
+        "business_confidence": -3
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": -5,
+          "loyalty": -4
+        },
+        "elena_voss": {
+          "trust": 5,
+          "loyalty": 3
+        },
+        "sofia_ren": {
+          "trust": 4
+        }
+      },
+      "faction_effects": {
+        "labour_federation": {
+          "support": 6,
+          "hostility": -4
+        },
+        "civic_reform_alliance": {
+          "support": 7,
+          "hostility": -4
+        },
+        "business_council": {
+          "support": -4,
+          "hostility": 3
+        }
+      }
+    },
+    {
+      "id": "negotiate_evacuation",
+      "text": "Open direct negotiations for a peaceful evacuation.",
+      "outcome": "Representatives from the occupation agree to talks. The district remains closed while negotiations continue, but both sides temporarily step back from confrontation.",
+      "effects": {
+        "public_trust": 3,
+        "unrest": -5,
+        "authority": -3,
+        "business_confidence": -2
+      },
+      "character_effects": {
+        "marcus_hale": {
+          "trust": -4,
+          "loyalty": -3
+        },
+        "elena_voss": {
+          "trust": 3
+        },
+        "sofia_ren": {
+          "trust": 5,
+          "loyalty": 3
+        }
+      },
+      "faction_effects": {
+        "labour_federation": {
+          "support": 8,
+          "hostility": -5
+        },
+        "civic_reform_alliance": {
+          "support": 4
+        },
+        "business_council": {
+          "support": -3
+        }
+      }
+    }
+  ]
+}

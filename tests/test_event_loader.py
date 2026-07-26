@@ -254,3 +254,82 @@ def test_unknown_character_condition_reference_is_rejected(
                 "elena_voss",
             },
         )
+
+def test_invalid_report_reliability_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """Report reliability must be between 0 and 100."""
+    event_data = build_valid_event(
+        event_id="bad_report",
+        order=10,
+    )
+
+    event_data["reports"] = [
+        {
+            "id": "bad_reliability",
+            "source_character_id": "elena_voss",
+            "statement": "A test statement.",
+            "reliability": 150,
+            "truth": "false",
+            "reveal_after_turns": 2,
+            "revelation": {
+                "title": "THE TRUTH",
+                "text": "The truth is revealed.",
+            },
+        }
+    ]
+
+    write_event(
+        directory=tmp_path,
+        filename="bad_report.json",
+        event_data=event_data,
+    )
+
+    with pytest.raises(
+        EventDataError,
+        match="reliability",
+    ):
+        load_events(
+            events_directory=tmp_path
+        )
+
+def test_unknown_report_source_is_rejected(
+    tmp_path: Path,
+) -> None:
+    """Reports must reference known characters."""
+    event_data = build_valid_event(
+        event_id="unknown_source",
+        order=10,
+    )
+
+    event_data["reports"] = [
+        {
+            "id": "unknown_source_report",
+            "source_character_id": "missing_person",
+            "statement": "A test statement.",
+            "reliability": 50,
+            "truth": "incomplete",
+            "reveal_after_turns": 2,
+            "revelation": {
+                "title": "THE TRUTH",
+                "text": "The truth is revealed.",
+            },
+        }
+    ]
+
+    write_event(
+        directory=tmp_path,
+        filename="unknown_source.json",
+        event_data=event_data,
+    )
+
+    with pytest.raises(
+        EventDataError,
+        match="unknown character ID",
+    ):
+        load_events(
+            events_directory=tmp_path,
+            known_character_ids={
+                "elena_voss",
+            },
+        )

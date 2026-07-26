@@ -6,6 +6,22 @@ from app.engine.character_loader import (
     CharacterDataError,
     load_characters,
 )
+from app.engine.report_engine import (
+    build_information_reports,
+    build_report_snapshots,
+    get_next_report_revelation_turn,
+    get_report_assessment,
+    resolve_due_report_revelations,
+)
+from app.engine.report_engine import (
+    build_information_reports,
+    build_report_snapshots,
+    get_next_report_revelation_turn,
+    resolve_due_report_revelations,
+)
+from app.models.information_report import (
+    InformationReport,
+)
 from app.engine.consequence_engine import (
     get_next_scheduled_turn,
     resolve_due_consequences,
@@ -212,6 +228,8 @@ def ask_to_continue() -> bool:
 def display_event(
     event: dict,
     turn_number: int,
+    state: GameState,
+    reports: list[InformationReport],
 ) -> None:
     """Display an event and its choices."""
     display_separator()
@@ -221,6 +239,10 @@ def display_event(
     print("-" * len(event["title"]))
     print()
     print(event["description"])
+    display_information_reports(
+        state=state,
+        reports=reports,
+    )
     print()
     print("What will you do?")
     print()
@@ -471,6 +493,21 @@ def display_decision_history(state: GameState) -> None:
         )
         print(f"Decision: {record.choice_text}")
 
+        if record.information_reports:
+            print("Information available at the time:")
+
+            for report in record.information_reports:
+                print(
+                    f"  - {report['source']}"
+                )
+                print(
+                    f"    {report['statement']}"
+                )
+                print(
+                    f"    Assessment: "
+                    f"{report['assessment']}"
+                )
+
         print("City impact:")
 
         if not record.stat_changes:
@@ -595,34 +632,68 @@ def run_game() -> None:
             events=events,
         )
 
-        next_scheduled_turn = get_next_scheduled_turn(
-            state
+        next_consequence_turn = (
+            get_next_scheduled_turn(state)
+        )
+
+        next_revelation_turn = (
+            get_next_report_revelation_turn(
+                state=state,
+                events=events,
+            )
+        )
+
+        pending_turns = [
+            turn
+            for turn in (
+                next_consequence_turn,
+                next_revelation_turn,
+            )
+            if turn is not None
+        ]
+
+        next_pending_turn = (
+            min(pending_turns)
+            if pending_turns
+            else None
         )
 
         if (
-            available_event is None
-            and next_scheduled_turn is None
+                available_event is None
+                and next_pending_turn is None
         ):
             break
 
         if (
-            available_event is None
-            and next_scheduled_turn is not None
-            and next_scheduled_turn
-            > state.current_turn + 1
+                available_event is None
+                and next_pending_turn is not None
+                and next_pending_turn
+                > state.current_turn + 1
         ):
             display_time_advance(
                 current_turn=state.current_turn,
-                target_turn=next_scheduled_turn,
+                target_turn=next_pending_turn,
             )
 
-            state.current_turn = next_scheduled_turn - 1
+            state.current_turn = (
+                    next_pending_turn - 1
+            )
 
-        state.current_turn += 1
-
-        resolved_consequences = resolve_due_consequences(
-            state
+        revealed_reports = (
+            resolve_due_report_revelations(
+                state=state,
+                events=events,
+            )
         )
+
+        for report in revealed_reports:
+            display_report_revelation(
+                state=state,
+                report=report,
+            )
+
+        if revealed_reports:
+            autosave_state(state)
 
         for consequence, consequence_changes in (
             resolved_consequences
@@ -644,13 +715,24 @@ def run_game() -> None:
         if event is None:
             continue
 
+        information_reports = (
+            build_information_reports(event)
+        )
+
         display_event(
             event=event,
             turn_number=state.current_turn,
+            state=state,
+            reports=information_reports,
         )
 
         selected_choice_index = get_player_choice(
             number_of_choices=len(event["choices"])
+        )
+
+        report_snapshots = build_report_snapshots(
+            state=state,
+            reports=information_reports,
         )
 
         selected_choice = event["choices"][
@@ -688,6 +770,7 @@ def run_game() -> None:
             stat_changes=stat_changes,
             character_changes=character_changes,
             faction_changes=faction_changes,
+            information_reports=report_snapshots,
         )
 
         scheduled_consequences = (
@@ -757,3 +840,57 @@ def run_game() -> None:
     display_factions(state)
     display_decision_history(state)
     print()
+
+def display_information_reports(
+    state: GameState,
+    reports: list[InformationReport],
+) -> None:
+    """Display uncertain reports without revealing the truth."""
+    if not reports:
+        return
+
+    print()
+    print("INFORMATION AVAILABLE")
+    print("---------------------")
+
+    for report in reports:
+        character = state.get_character(
+            report.source_character_id
+        )
+
+        print()
+        print(
+            f"{character.name} — "
+            f"{character.role}"
+        )
+        print(report.statement)
+        print(
+            get_report_assessment(
+                state=state,
+                report=report,
+            )
+        )
+
+def display_report_revelation(
+    state: GameState,
+    report: InformationReport,
+) -> None:
+    """Display the later truth about an earlier report."""
+    character = state.get_character(
+        report.source_character_id
+    )
+
+    display_separator()
+
+    print(f"TURN {state.current_turn}")
+    print("INFORMATION REVEALED")
+    print("--------------------")
+    print(report.revelation_title)
+    print("-" * len(report.revelation_title))
+    print()
+    print(
+        f"Original source: "
+        f"{character.name} — {character.role}"
+    )
+    print()
+    print(report.revelation_text)

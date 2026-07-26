@@ -1,7 +1,7 @@
 """Decision history model for The Last Mandate."""
 
 from dataclasses import dataclass
-
+from dataclasses import dataclass, field
 
 CharacterChanges = dict[
     str,
@@ -12,6 +12,7 @@ FactionChanges = dict[
     str,
     dict[str, tuple[int, int]],
 ]
+
 
 
 @dataclass
@@ -27,3 +28,6 @@ class DecisionRecord:
     stat_changes: dict[str, tuple[int, int]]
     character_changes: CharacterChanges
     faction_changes: FactionChanges
+    information_reports: list[
+        dict[str, str]
+    ] = field(default_factory=list)

@@ -53,6 +53,9 @@ class GameState:
     resolved_consequence_ids: set[str] = field(
         default_factory=set
     )
+    revealed_report_ids: set[str] = field(
+        default_factory=set
+    )
 
     def apply_effects(
         self,
@@ -99,6 +102,9 @@ class GameState:
             stat_changes: dict[str, tuple[int, int]],
             character_changes: CharacterChanges | None = None,
             faction_changes: FactionChanges | None = None,
+            information_reports: list[
+                                     dict[str, str]
+                                 ] | None = None,
     ) -> DecisionRecord:
         """Record a completed event and selected choice."""
         event_id = event["id"]
@@ -122,6 +128,12 @@ class GameState:
             faction_changes=dict(
                 faction_changes or {}
             ),
+            information_reports=[
+                dict(report)
+                for report in (
+                        information_reports or []
+                )
+            ],
         )
 
         self.decision_history.append(
@@ -177,3 +189,10 @@ class GameState:
             )
 
         return faction
+
+    def has_revealed_report(
+            self,
+            report_id: str,
+    ) -> bool:
+        """Return whether a hidden report has been revealed."""
+        return report_id in self.revealed_report_ids

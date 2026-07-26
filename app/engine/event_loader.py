@@ -7,7 +7,9 @@ from app.models.character_state import RELATIONSHIP_LABELS
 #from app.engine.condition_engine import COMPARISON_OPERATORS
 from app.models.game_state import STAT_LABELS
 from app.models.faction_state import FACTION_STAT_LABELS
-
+from app.models.information_report import (
+    TRUTH_STATUSES,
+)
 from app.engine.condition_engine import (
     COMPARISON_OPERATORS,
     CONDITION_TYPES,
@@ -63,6 +65,7 @@ def load_events(
         events.append(event)
 
     _validate_condition_references(events)
+    _validate_report_ids(events)
 
     if known_character_ids is not None:
         _validate_character_references(
@@ -156,6 +159,8 @@ def _validate_event(
         context=context,
     )
 
+
+
     if event["id"] in existing_event_ids:
         raise EventDataError(
             f"{context} uses duplicate event ID "
@@ -194,6 +199,11 @@ def _validate_event(
     _validate_choices(
         choices=event["choices"],
         context=context,
+    )
+
+    _validate_reports(
+        reports=event.get("reports", []),
+        context=f"Event '{event['id']}'",
     )
 
 
@@ -747,6 +757,21 @@ def _validate_character_references(
                         "references unknown character ID "
                         f"'{character_id}'."
                     )
+        for report_number, report in enumerate(
+                event.get("reports", []),
+                start=1,
+        ):
+            character_id = report[
+                "source_character_id"
+            ]
+
+            if character_id not in known_character_ids:
+                raise EventDataError(
+                    f"Event '{event['id']}', "
+                    f"report {report_number}, "
+                    "references unknown character ID "
+                    f"'{character_id}'."
+                )
 
 def _require_fields(
     data: dict[str, Any],
@@ -902,3 +927,155 @@ def _validate_faction_references(
                         "references unknown faction ID "
                         f"'{faction_id}'."
                     )
+
+def _validate_reports(
+    reports: Any,
+    context: str,
+) -> None:
+    """Validate optional unreliable-information reports."""
+    if not isinstance(reports, list):
+        raise EventDataError(
+            f"{context} field 'reports' "
+            "must be a list."
+        )
+
+    local_report_ids: set[str] = set()
+
+    for report_number, report in enumerate(
+        reports,
+        start=1,
+    ):
+        report_context = (
+            f"{context}, report {report_number}"
+        )
+
+        if not isinstance(report, dict):
+            raise EventDataError(
+                f"{report_context} must be an object."
+            )
+
+        _require_fields(
+            data=report,
+            required_fields={
+                "id",
+                "source_character_id",
+                "statement",
+                "reliability",
+                "truth",
+                "reveal_after_turns",
+                "revelation",
+            },
+            context=report_context,
+        )
+
+        for field_name in (
+            "id",
+            "source_character_id",
+            "statement",
+        ):
+            _validate_non_empty_string(
+                value=report[field_name],
+                field_name=field_name,
+                context=report_context,
+            )
+
+        report_id = report["id"]
+
+        if report_id in local_report_ids:
+            raise EventDataError(
+                f"{report_context} uses duplicate "
+                f"report ID '{report_id}'."
+            )
+
+        local_report_ids.add(report_id)
+
+        reliability = report["reliability"]
+
+        if (
+            type(reliability) is not int
+            or not 0 <= reliability <= 100
+        ):
+            raise EventDataError(
+                f"{report_context} field "
+                "'reliability' must be an integer "
+                "between 0 and 100."
+            )
+
+        truth = report["truth"]
+
+        if truth not in TRUTH_STATUSES:
+            raise EventDataError(
+                f"{report_context} uses unknown "
+                f"truth status '{truth}'."
+            )
+
+        reveal_after_turns = report[
+            "reveal_after_turns"
+        ]
+
+        if (
+            type(reveal_after_turns) is not int
+            or reveal_after_turns < 1
+        ):
+            raise EventDataError(
+                f"{report_context} field "
+                "'reveal_after_turns' must be "
+                "a positive integer."
+            )
+
+        revelation = report["revelation"]
+
+        if not isinstance(revelation, dict):
+            raise EventDataError(
+                f"{report_context} field "
+                "'revelation' must be an object."
+            )
+
+        _require_fields(
+            data=revelation,
+            required_fields={
+                "title",
+                "text",
+            },
+            context=(
+                f"{report_context} revelation"
+            ),
+        )
+
+        for field_name in (
+            "title",
+            "text",
+        ):
+            _validate_non_empty_string(
+                value=revelation[field_name],
+                field_name=field_name,
+                context=(
+                    f"{report_context} revelation"
+                ),
+            )
+
+def _validate_report_ids(
+    events: list[dict[str, Any]],
+) -> None:
+    """Require report IDs to be unique across all events."""
+    report_locations: dict[str, str] = {}
+
+    for event in events:
+        for report in event.get("reports", []):
+            report_id = report["id"]
+
+            existing_event_id = report_locations.get(
+                report_id
+            )
+
+            if existing_event_id is not None:
+                raise EventDataError(
+                    f"Report ID '{report_id}' appears "
+                    f"in both event "
+                    f"'{existing_event_id}' and "
+                    f"event '{event['id']}'."
+                )
+
+            report_locations[report_id] = (
+                event["id"]
+            )

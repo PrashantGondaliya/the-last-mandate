@@ -297,3 +297,75 @@ def test_faction_state_survives_save_and_load(
     assert loaded_faction.support == 38
     assert loaded_faction.influence == 72
     assert loaded_faction.hostility == 41
+
+def test_report_information_survives_save_and_load(
+    tmp_path: Path,
+) -> None:
+    """Reports and revelations should survive loading."""
+    save_path = tmp_path / "report_save.json"
+
+    state = GameState(
+        player_name="Test Governor",
+        revealed_report_ids={
+            "docklands_hale_armed_groups",
+        },
+    )
+
+    event = {
+        "id": "docklands_standoff",
+        "title": "THE DOCKLANDS STANDOFF",
+    }
+
+    choice = {
+        "id": "send_independent_observers",
+        "text": "Send independent observers.",
+        "effects": {},
+    }
+
+    visible_reports = [
+        {
+            "report_id": (
+                "docklands_hale_armed_groups"
+            ),
+            "source": (
+                "Marcus Hale — Police Commissioner"
+            ),
+            "statement": (
+                "Hale reports an armed threat."
+            ),
+            "assessment": (
+                "You currently have cautious "
+                "confidence in this source."
+            ),
+        }
+    ]
+
+    state.record_decision(
+        turn_number=5,
+        event=event,
+        choice=choice,
+        stat_changes={},
+        information_reports=visible_reports,
+    )
+
+    save_game(
+        state=state,
+        file_path=save_path,
+    )
+
+    loaded_state = load_game(
+        file_path=save_path,
+    )
+
+    assert loaded_state.revealed_report_ids == {
+        "docklands_hale_armed_groups"
+    }
+
+    loaded_record = (
+        loaded_state.decision_history[0]
+    )
+
+    assert (
+        loaded_record.information_reports
+        == visible_reports
+    )

@@ -16,7 +16,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 SAVES_DIRECTORY = PROJECT_ROOT / "saves"
 AUTOSAVE_PATH = SAVES_DIRECTORY / "autosave.json"
 
-SAVE_VERSION = 3
+SAVE_VERSION = 4
 
 
 class SaveDataError(ValueError):
@@ -72,6 +72,9 @@ def save_game(
             ],
             "resolved_consequence_ids": sorted(
                 state.resolved_consequence_ids
+            ),
+            "revealed_report_ids": sorted(
+                state.revealed_report_ids
             ),
         },
     }
@@ -224,6 +227,9 @@ def load_game(
             resolved_consequence_ids=set(
                 state_data["resolved_consequence_ids"]
             ),
+            revealed_report_ids=set(
+                state_data["revealed_report_ids"]
+            ),
         )
 
     except SaveDataError:
@@ -255,6 +261,7 @@ def _validate_state_fields(
         "unrest",
         "infrastructure",
         "authority",
+        "revealed_report_ids",
         "business_confidence",
         "characters",
         "factions",
@@ -281,6 +288,7 @@ def _validate_state_fields(
         "decision_history",
         "scheduled_consequences",
         "resolved_consequence_ids",
+        "revealed_report_ids",
     }
 
     for field_name in list_fields:
@@ -414,6 +422,7 @@ def _deserialize_decision_record(
         "stat_changes",
         "character_changes",
         "faction_changes",
+        "information_reports",
     }
 
     missing_fields = required_fields - record_data.keys()
@@ -450,6 +459,12 @@ def _deserialize_decision_record(
         label="faction",
     )
 
+    information_reports = (
+        _deserialize_information_reports(
+            record_data["information_reports"]
+        )
+    )
+
     return DecisionRecord(
         turn_number=record_data["turn_number"],
         event_id=record_data["event_id"],
@@ -460,6 +475,7 @@ def _deserialize_decision_record(
         stat_changes=stat_changes,
         character_changes=character_changes,
         faction_changes=faction_changes,
+        information_reports=information_reports,
     )
 
 
@@ -648,6 +664,16 @@ def _validate_loaded_state(
         )
 
     if not all(
+            isinstance(report_id, str)
+            and report_id.strip()
+            for report_id in state.revealed_report_ids
+    ):
+        raise SaveDataError(
+            "Revealed report IDs must be "
+            "non-empty strings."
+        )
+
+    if not all(
         isinstance(consequence_id, str)
         for consequence_id
         in state.resolved_consequence_ids
@@ -723,3 +749,73 @@ def _validate_loaded_factions(
                     f"'{stat_name}' must be between "
                     "0 and 100."
                 )
+
+def _deserialize_information_reports(
+    reports_data: Any,
+) -> list[dict[str, str]]:
+    """Restore visible information-report snapshots."""
+    if not isinstance(reports_data, list):
+        raise SaveDataError(
+            "Decision information reports "
+            "must be a list."
+        )
+
+    restored_reports: list[
+        dict[str, str]
+    ] = []
+
+    required_fields = {
+        "report_id",
+        "source",
+        "statement",
+        "assessment",
+    }
+
+    for report_number, report in enumerate(
+        reports_data,
+        start=1,
+    ):
+        if not isinstance(report, dict):
+            raise SaveDataError(
+                "Decision information report "
+                f"{report_number} must be an object."
+            )
+
+        missing_fields = (
+            required_fields - report.keys()
+        )
+
+        if missing_fields:
+            formatted_fields = ", ".join(
+                sorted(missing_fields)
+            )
+
+            raise SaveDataError(
+                "Decision information report "
+                f"{report_number} is missing "
+                f"field(s): {formatted_fields}."
+            )
+
+        restored_report: dict[str, str] = {}
+
+        for field_name in required_fields:
+            value = report[field_name]
+
+            if (
+                not isinstance(value, str)
+                or not value.strip()
+            ):
+                raise SaveDataError(
+                    "Decision information report "
+                    f"{report_number} field "
+                    f"'{field_name}' must be a "
+                    "non-empty string."
+                )
+
+            restored_report[field_name] = value
+
+        restored_reports.append(
+            restored_report
+        )
+
+    return restored_reports
