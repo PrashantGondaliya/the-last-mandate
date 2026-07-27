@@ -180,3 +180,19 @@ def test_next_revelation_turn_is_calculated() -> None:
     )
 
     assert next_turn == 5
+
+
+def test_report_assessment_warns_about_low_trust() -> None:
+    """Low source trust should produce a strong warning."""
+    state = build_state(trust=20)
+
+    report = build_information_reports(
+        build_report_event()
+    )[0]
+
+    assessment = get_report_assessment(
+        state=state,
+        report=report,
+    )
+
+    assert "very little confidence" in assessment
