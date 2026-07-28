@@ -196,3 +196,19 @@ def test_report_assessment_warns_about_low_trust() -> None:
     )
 
     assert "very little confidence" in assessment
+
+
+def test_report_assessment_uses_cautious_confidence_at_fifty() -> None:
+    """Trust of exactly 50 should use cautious confidence."""
+    state = build_state(trust=50)
+
+    report = build_information_reports(
+        build_report_event()
+    )[0]
+
+    assessment = get_report_assessment(
+        state=state,
+        report=report,
+    )
+
+    assert "cautious confidence" in assessment
