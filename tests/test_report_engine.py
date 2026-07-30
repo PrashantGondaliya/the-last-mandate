@@ -212,3 +212,18 @@ def test_report_assessment_uses_cautious_confidence_at_fifty() -> None:
     )
 
     assert "cautious confidence" in assessment
+
+def test_report_assessment_uses_high_credibility_at_seventy() -> None:
+    """Trust of exactly 70 should mark the source highly credible."""
+    state = build_state(trust=70)
+
+    report = build_information_reports(
+        build_report_event()
+    )[0]
+
+    assessment = get_report_assessment(
+        state=state,
+        report=report,
+    )
+
+    assert "highly credible" in assessment
