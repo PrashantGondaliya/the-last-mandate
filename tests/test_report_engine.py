@@ -227,3 +227,18 @@ def test_report_assessment_uses_high_credibility_at_seventy() -> None:
     )
 
     assert "highly credible" in assessment
+
+def test_report_assessment_uses_serious_reservations_at_thirty() -> None:
+    """Trust of exactly 30 should show serious reservations."""
+    state = build_state(trust=30)
+
+    report = build_information_reports(
+        build_report_event()
+    )[0]
+
+    assessment = get_report_assessment(
+        state=state,
+        report=report,
+    )
+
+    assert "serious reservations" in assessment
