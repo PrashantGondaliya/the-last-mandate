@@ -242,3 +242,19 @@ def test_report_assessment_uses_serious_reservations_at_thirty() -> None:
     )
 
     assert "serious reservations" in assessment
+
+def test_report_assessment_remains_cautious_below_seventy() -> None:
+    """Trust below 70 should not mark a source highly credible."""
+    state = build_state(trust=69)
+
+    report = build_information_reports(
+        build_report_event()
+    )[0]
+
+    assessment = get_report_assessment(
+        state=state,
+        report=report,
+    )
+
+    assert "cautious confidence" in assessment
+    assert "highly credible" not in assessment
